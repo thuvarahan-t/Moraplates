@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Navigate, useParams } from 'react-router'
+import { Navigate, useNavigate, useParams } from 'react-router'
 import { Link } from '../components/NavLinks'
 import Avatar from '../components/Avatar'
 import Loader from '../components/Loader'
@@ -73,6 +73,12 @@ function OwnProfile({ uid, email, profile }) {
   const { signOut, refreshProfile } = useAuth()
   const { openPost } = usePost()
   const { toast } = useFx()
+  const navigate = useNavigate()
+  const leave = async () => {
+    await signOut()
+    toast('Signed out. See you at lunch!')
+    navigate('/welcome')
+  }
   const { data } = useQuery(() => fetchProfilePage(uid), [uid])
   const [editing, setEditing] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -128,7 +134,7 @@ function OwnProfile({ uid, email, profile }) {
       posts={data?.posts}
       platesTitle="Your plates"
       emptyPlates="No plates yet. Tap + to post your first one."
-      after={<button className="btn ghost sm signout" onClick={signOut}><LogOutIcon />Sign out</button>}
+      after={<button className="btn ghost sm signout" onClick={leave}><LogOutIcon />Sign out</button>}
     />
   )
 }
