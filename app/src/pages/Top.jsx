@@ -5,6 +5,7 @@ import { CheckIcon, CrownIcon, HeartIcon } from '../components/icons'
 import { useAuth } from '../lib/auth'
 import Avatar from '../components/Avatar'
 import Loader from '../components/Loader'
+import VotesChart from '../components/VotesChart'
 import { plural } from '../lib/format'
 import { superPercent, totalRatings } from '../lib/food'
 import { centreOf, useFx } from '../lib/fx'
@@ -32,6 +33,7 @@ export default function Top() {
       <div className="vh"><div><h2>Top this week</h2><p>Votes reset every Monday at 8am.</p></div></div>
       {error && <div className="card empty"><h3>Couldn't load the rankings</h3><p>Check your connection and try again.</p></div>}
       {!data && !error && <Loader label="Loading rankings" />}
+      {data && <VotesChart canteens={canteens} />}
       {data && <VoteBoard canteens={canteens} myVote={data.myVote} photos={data.photos} onVoted={reload} />}
 
       {data && <>
