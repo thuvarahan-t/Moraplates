@@ -14,3 +14,6 @@ dist/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Vite dependency cache
+.vite/
