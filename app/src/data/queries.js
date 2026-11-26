@@ -35,12 +35,8 @@ export async function fetchPosts(viewerId, { canteenId, authorId, postId, before
   if (before) q = q.or('created_at.lt.' + before.createdIso + ',and(created_at.eq.' + before.createdIso + ',id.lt.' + before.id + ')')
   if (canteenId) q = q.eq('canteen_id', canteenId)
   if (authorId) q = q.eq('user_id', authorId)
-  // The viewer's recent likes load alongside the posts instead of after them.
-  const [res] = await Promise.all([
-    q,
-    null,
-  ])
-  const rows = check(res)
+  // Resolve likes only for the returned page (not an arbitrary recent-likes limit).
+  const rows = check(await q)
   const mine = new Set(viewerId && rows.length ? check(await supabase.from('likes').select('post_id').eq('user_id', viewerId).in('post_id', rows.map(r => r.id))).map(l => l.post_id) : [])
   return rows.map(r => ({
     id: r.id,

@@ -1,4 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
+import { Share2, Navigation, Clock } from 'lucide-react'
+import CropPhoto from '../components/CropPhoto'
+import { shareLink } from '../lib/share'
+import { supabase } from '../lib/supabase'
+import { SAMPLE_CANTEENS, SAMPLE_FOODS } from '../data/sample'
+import { samplePosts } from '../data/feed'
 import { useParams } from 'react-router'
 import { Link } from '../components/NavLinks'
 import CountUp from '../components/CountUp'
@@ -9,7 +15,7 @@ import PostCard from '../components/PostCard'
 import { BackIcon, CameraIcon, CheckIcon, HeartIcon, MapIcon, PinIcon, TrashIcon } from '../components/icons'
 import Slideshow, { Credit, Dots } from '../components/Slideshow'
 import { useQuery } from '../data/useQuery'
-import { addCanteenPhoto, addFood, pinCanteen, castVote, deleteCanteenPhoto, fetchCanteenPage, friendly, removeVote } from '../data/queries'
+import { addCanteenPhoto, addFood, pinCanteen, castVote, deleteCanteenPhoto, fetchCanteenPage, friendly, removeVote, reportClosed } from '../data/queries'
 import { useLikeToggle } from '../data/feed'
 import { useAuth } from '../lib/auth'
 import { centreOf, useFx } from '../lib/fx'
@@ -17,20 +23,24 @@ import { usePost } from '../lib/post'
 import { useSignInGate } from '../lib/useSignInGate'
 import { REDUCED_MOTION } from '../lib/motion'
 import { plural } from '../lib/format'
-import { canteenSuper, hourLabel, isOpen, percent, ratingChip, superPercent, totalRatings } from '../lib/food'
+import { canteenSuper, hourLabel, isOpen, isReportedClosed, percent, ratingChip, superPercent, totalRatings } from '../lib/food'
 
 /** One canteen: vote, menu, add food, latest plates (renderCanteen() in index.html). */
 export default function Canteen() {
   const { id } = useParams()
   const { session } = useAuth()
   const uid = session?.user?.id
-  const { data, loading, error, reload } = useQuery(() => fetchCanteenPage(id, uid), [id, uid])
+  const { data, loading, error, reload } = useQuery(() => supabase ? fetchCanteenPage(id, uid) : Promise.resolve((()=>{const c=SAMPLE_CANTEENS.find(x=>x.id===id);return c?{canteen:c,rank:1+SAMPLE_CANTEENS.filter(x=>x.votes>c.votes).length,foods:SAMPLE_FOODS.filter(f=>f.canteenId===id),posts:samplePosts().filter(p=>p.canteenId===id),myVote:null,photos:[]}:null})()), [id, uid])
   const { toast, confetti } = useFx()
-  const { openPost } = usePost()
+  const { openPost, invalidate } = usePost()
   const gate = useSignInGate()
   const voteBtn = useRef(null)
   const [voting, setVoting] = useState(false)
   const [photoBusy, setPhotoBusy] = useState(false)
+  const [cropFile,setCropFile]=useState(null)
+  const [reportBusy,setReportBusy]=useState(false)
+  const [now,setNow]=useState(Date.now())
+  useEffect(()=>{const t=setInterval(()=>setNow(Date.now()),30_000);return()=>clearInterval(t)},[])
 
   // Local copy of the latest posts so likes can update optimistically.
   const [posts, setPosts] = useState([])
@@ -52,7 +62,15 @@ export default function Canteen() {
   const { canteen: c, rank, foods, myVote, photos } = data
   const menu = [...foods].sort((a, b) => superPercent(b) - superPercent(a) || totalRatings(b) - totalRatings(a))
   const fav = myVote === c.id
-  const open = isOpen(c)
+  const open = isOpen(c,now)
+  const reported = isReportedClosed(c,now)
+  const share = async()=>{if(await shareLink('/canteens/'+c.id,c.name+' · MoraPlates')==='copied')toast('Canteen link copied')}
+  const closure = async withdraw=>{
+    if(reportBusy||!gate('to report canteen hours'))return
+    setReportBusy(true)
+    try{await reportClosed(c.id,withdraw);toast(withdraw?'Your report withdrawn':'Reported closed for up to 60 minutes');invalidate();reload()}
+    catch(e){toast(friendly(e))}finally{setReportBusy(false)}
+  }
   const ratings = foods.reduce((n, f) => n + totalRatings(f), 0)
 
   const vote = async () => {
@@ -77,10 +95,9 @@ export default function Canteen() {
     }
   }
 
-  const addPhoto = async e => {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file) return
+  const addPhoto = async file => {
+    setCropFile(null)
+    if (!file || !uid) return
     setPhotoBusy(true)
     try {
       await addCanteenPhoto(uid, c.id, file)
@@ -108,7 +125,7 @@ export default function Canteen() {
     <div className="ctx">
       {c.votes > 0 && <span className="pill">#{rank} this week</span>}
       <h2>{c.name}</h2>
-      <p>{c.location} · <span className={'open ' + (open ? 'y' : 'n')}>{open ? 'Open now' : 'Closed'}, {hourLabel(c.opensAt)} to {hourLabel(c.closesAt)}</span></p>
+      <p>{c.location} · <span className={'open ' + (open ? 'y' : 'n')}>{reported ? 'Reported closed' : open ? 'Open now' : 'Closed'}, {hourLabel(c.opensAt)} to {hourLabel(c.closesAt)}</span></p>
       {c.knownFor && <p>Known for {c.knownFor.toLowerCase()}</p>}
       <div className="cacts">
         <button ref={voteBtn} className={'btn' + (fav ? ' voted' : '')} aria-pressed={fav} onClick={vote} disabled={voting}>
@@ -116,9 +133,12 @@ export default function Canteen() {
         </button>
         <label className={'btn ghost addph' + (photoBusy ? ' busy' : '')} onClick={e => { if (!gate('to add photos')) e.preventDefault() }}>
           <CameraIcon size={18} />{photoBusy ? 'Uploading…' : 'Add photo'}
-          <input type="file" accept="image/*" onChange={addPhoto} disabled={photoBusy} hidden />
+          <input type="file" accept="image/*" aria-label="Add canteen photo" onChange={e=>{const f=e.target.files?.[0];e.target.value='';if(f)setCropFile(f)}} disabled={photoBusy} hidden />
         </label>
+        <button className="btn ghost sm" onClick={share}><Share2 size={18}/>Share</button>
+        {c.lat!=null && <a className="btn ghost sm" href={'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(c.lat+','+c.lng)} target="_blank" rel="noreferrer"><Navigation size={18}/>Directions</a>}
       </div>
+      <div className="closure-box"><Clock size={19}/><div><b>{reported?'Community report: closed':'Is the canteen closed now?'}</b><small>{reported?'A student reported a temporary closure. Reports expire automatically.':'Report a temporary closure for 60 minutes.'}</small></div><button className="mini" disabled={reportBusy} onClick={()=>closure(false)}>Report closed</button>{reported&&<button className="mini" disabled={reportBusy} onClick={()=>closure(true)}>Undo my report</button>}</div>
     </div>
   )
 
@@ -147,6 +167,7 @@ export default function Canteen() {
         </div>
       )}
 
+      {cropFile && <CropPhoto file={cropFile} fixedAspect={4/3} onCancel={()=>setCropFile(null)} onDone={addPhoto}/>}
       <div className="stats rise" style={{ '--i': 1 }}>
         <div><CountUp to={c.votes} /><span>votes this week</span></div>
         <div><CountUp to={canteenSuper(foods)} suffix="%" /><span>ratings say Super</span></div>

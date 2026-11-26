@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { Link } from '../components/NavLinks'
 import MapView, { locate } from '../components/MapView'
+import CropPhoto from '../components/CropPhoto'
 import { BackIcon, CameraIcon, PinIcon } from '../components/icons'
 import { addCanteen, friendly } from '../data/queries'
 import { useAuth } from '../lib/auth'
@@ -21,6 +22,7 @@ export default function AddCanteen() {
   const [f, setF] = useState({ name: '', location: '', knownFor: '', opensAt: 7, closesAt: 18 })
   const [spot, setSpot] = useState(null)
   const [photo, setPhoto] = useState(null)
+  const [cropFile, setCropFile] = useState(null)
   const [preview, setPreview] = useState(null)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
@@ -36,6 +38,7 @@ export default function AddCanteen() {
 
   const submit = async e => {
     e.preventDefault()
+    if(busy || cropFile) return
     if (f.name.trim().length < 2) return setErr('Enter the canteen name.')
     if (f.location.trim().length < 2) return setErr('Say where it is, like "Behind the civil faculty".')
     if (f.closesAt <= f.opensAt) return setErr('Closing time must be after opening time.')
@@ -78,14 +81,14 @@ export default function AddCanteen() {
           </div>
         </div>
 
-        <label className="pick small">
+        {cropFile ? <CropPhoto file={cropFile} fixedAspect={4/3} onCancel={()=>setCropFile(null)} onDone={f=>{setPhoto(f);setPreview(URL.createObjectURL(f));setCropFile(null)}}/> : <label className="pick small">
           {preview ? <><img src={preview} alt="Canteen" /><span className="chg">Change photo</span></> : <><CameraIcon /><span>Add a photo of the canteen <em>(optional)</em></span></>}
           <input type="file" accept="image/*" aria-label="Photo of the canteen"
-            onChange={e => { const x = e.target.files?.[0]; if (x) { setPhoto(x); setPreview(URL.createObjectURL(x)) } }} />
-        </label>
+            onChange={e => { const x = e.target.files?.[0]; e.target.value=''; if (x) setCropFile(x) }} />
+        </label>}
 
         <p className="err" role="alert">{err}</p>
-        <button className="btn wide" disabled={busy}>{busy ? 'Adding…' : 'Add canteen'}</button>
+        <button className="btn wide" disabled={busy || !!cropFile}>{busy ? 'Adding…' : 'Add canteen'}</button>
         <p className="wl-note">You can add its foods and prices right after.</p>
       </form>
     </div></div></section>

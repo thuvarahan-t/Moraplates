@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import People from '../components/People'
+import CropPhoto from '../components/CropPhoto'
 import { samplePosts } from '../data/feed'
 import { Navigate, useNavigate, useParams } from 'react-router'
 import { Link } from '../components/NavLinks'
@@ -85,13 +86,13 @@ function OwnProfile({ uid, email, profile }) {
   const { data, error, reload } = useQuery(() => fetchProfilePage(uid), [uid])
   const [editing, setEditing] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [cropFile,setCropFile]=useState(null)
   // New accounts start with the email name ("thuvarahant.23"); nudge them to set a real one.
   const needsName = profile.fullName === email.split('@')[0]
   const sub = [profile.faculty, profile.batch].filter(Boolean).join(' · ') || email
 
-  const pickAvatar = async e => {
-    const file = e.target.files?.[0]
-    e.target.value = ''
+  const pickAvatar = async file => {
+    setCropFile(null)
     if (!file) return
     setUploading(true)
     try {
@@ -113,7 +114,7 @@ function OwnProfile({ uid, email, profile }) {
         <label className={'avpick' + (uploading ? ' busy' : '')} title="Change profile photo">
           <Avatar name={profile.fullName} url={profile.avatar} />
           <span className="avcam" aria-hidden="true"><CameraIcon size={16} /></span>
-          <input type="file" accept="image/*" onChange={pickAvatar} disabled={uploading} aria-label="Change profile photo" hidden />
+          <input type="file" accept="image/*" onChange={e=>{const f=e.target.files?.[0];e.target.value='';if(f)setCropFile(f)}} disabled={uploading} aria-label="Change profile photo" hidden />
         </label>
         <div className="who"><b>{profile.fullName}</b><span style={{ color: 'var(--mut)' }}>{uploading ? 'Uploading photo…' : sub}</span></div>
         <div className="pro-acts">
@@ -121,7 +122,7 @@ function OwnProfile({ uid, email, profile }) {
           <button className="btn sm" onClick={() => openPost()}>Post your plate</button>
         </div>
       </>}
-      below={(editing || needsName) && <EditProfile uid={uid} profile={profile} onDone={() => setEditing(false)} />}
+      below={<>{cropFile && <CropPhoto file={cropFile} fixedAspect={1} max={600} onCancel={()=>setCropFile(null)} onDone={pickAvatar}/>} {(editing || needsName) && <EditProfile uid={uid} profile={profile} onDone={() => setEditing(false)} />}</>}
       extra={data?.favCanteen ? (
         <Link className="card ccard rise tilt" to={`/canteens/${data.favCanteen.id}`} style={{ '--i': 2, boxShadow: 'inset 0 0 0 2px var(--leaf)' }}>
           <span className="rank" style={{ background: 'var(--sb)', color: 'var(--st)' }}><HeartIcon /></span>
