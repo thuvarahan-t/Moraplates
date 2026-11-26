@@ -501,3 +501,33 @@ main{padding-bottom:clamp(24px,4vw,48px)}
 .auth-panel>.fl{flex:none}
 .auth-head h2{font-size:clamp(26px,6vw,32px)}.auth-head p{color:var(--mut);margin-top:6px;font-size:15px}
 .linkbtn{border:0;background:none;padding:0;font:inherit;font-weight:700;color:var(--brand);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+/* ---------- Top: votes-this-week column chart ---------- */
+.vchart{padding:18px 18px 16px;margin-bottom:16px}
+.vc-plot{position:relative;height:210px;margin:58px 0 0 30px} /* headroom for the leader's value + crown */
+.vc-grid{position:absolute;inset:0}
+.vc-tick{position:absolute;left:0;right:0;border-top:1px solid var(--line)}
+.vc-tick span{position:absolute;left:-30px;top:-8px;width:22px;text-align:right;font-size:11px;line-height:1;color:var(--mut);font-variant-numeric:tabular-nums}
+.vc-cols{position:absolute;inset:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
+.vc-col{position:relative;display:flex;justify-content:center;align-items:flex-end;height:100%;border-radius:12px 12px 0 0;text-decoration:none;color:var(--ink);transition:background .25s}
+.vc-col:is(:hover,:focus-visible){background:color-mix(in srgb,var(--tom) 7%,transparent)}
+/* bars: <=24px, 4px rounded cap, square at the baseline, grow in one after another */
+.vc-bar{display:block;width:min(24px,46%);height:max(var(--h),3px);border-radius:4px 4px 0 0;background:var(--tom);transform-origin:bottom;
+  animation:vcGrow .95s var(--spring) backwards;animation-delay:calc(var(--i) * 120ms + .15s);transition:height .7s var(--spring)}
+.vc-col:is(:hover,:focus-visible) .vc-bar{filter:brightness(1.06)}
+@keyframes vcGrow{from{transform:scaleY(0)}}
+.vc-cap{position:absolute;left:50%;bottom:calc(max(var(--h),3px) + 6px);transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:2px;
+  transition:bottom .7s var(--spring);animation:vcCap .5s var(--ease) backwards;animation-delay:calc(var(--i) * 120ms + .75s)}
+.vc-cap b{font:800 15px/1 'Bricolage Grotesque',sans-serif;color:var(--ink);font-variant-numeric:tabular-nums}
+.vc-crown{color:var(--mus);animation:bob 2.4s ease-in-out infinite}
+@keyframes vcCap{from{opacity:0;transform:translate(-50%,8px)}}
+.vc-tip{position:absolute;z-index:4;left:50%;bottom:calc(max(var(--h),3px) + 50px);transform:translate(-50%,4px);opacity:0;pointer-events:none;
+  display:flex;flex-direction:column;gap:2px;padding:8px 12px;border-radius:12px;background:var(--ink);color:var(--bg);font-size:12.5px;line-height:1.3;white-space:nowrap;
+  box-shadow:var(--sh);transition:opacity .2s,transform .2s}
+.vc-tip b{font-size:13.5px}
+.vc-col:first-child .vc-tip{left:0;transform:translate(0,4px)}.vc-col:last-child .vc-tip{left:auto;right:0;transform:translate(0,4px)}
+.vc-col:is(:hover,:focus-visible) .vc-tip{opacity:1;transform:translate(-50%,0)}
+.vc-col:is(:first-child,:last-child):is(:hover,:focus-visible) .vc-tip{transform:none}
+.vc-names{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;margin:8px 0 0 30px}
+.vc-names span{text-align:center;font-size:12px;font-weight:700;line-height:1.25;color:var(--mut);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.vc-empty{position:absolute;inset:0;margin:0;display:grid;place-items:center;padding:0 16px;text-align:center;font-size:14px;font-weight:600;color:var(--mut);pointer-events:none}
+@media(max-width:760px){.vc-plot{height:180px}}
