@@ -4,6 +4,7 @@ import CanteenThumb, { firstPhotoByCanteen } from '../components/CanteenThumb'
 import { CheckIcon, CrownIcon, HeartIcon } from '../components/icons'
 import { useAuth } from '../lib/auth'
 import Avatar from '../components/Avatar'
+import Loader from '../components/Loader'
 import { plural } from '../lib/format'
 import { superPercent, totalRatings } from '../lib/food'
 import { centreOf, useFx } from '../lib/fx'
@@ -30,8 +31,10 @@ export default function Top() {
     <section className="view"><div className="band"><div className="wrap">
       <div className="vh"><div><h2>Top this week</h2><p>Votes reset every Monday at 8am.</p></div></div>
       {error && <div className="card empty"><h3>Couldn't load the rankings</h3><p>Check your connection and try again.</p></div>}
+      {!data && !error && <Loader label="Loading rankings" />}
       {data && <VoteBoard canteens={canteens} myVote={data.myVote} photos={data.photos} onVoted={reload} />}
 
+      {data && <>
       <div className="podium">
         {podium.map(([c, n, h, d]) => (
           <Link key={c.id} className="pod" to={`/canteens/${c.id}`} style={{ '--cc': c.colour, '--h': h + 'px', '--d': d }}>
@@ -70,6 +73,7 @@ export default function Top() {
           {data && !data.foodies.length && <p style={{ color: 'var(--mut)' }}>Post a plate to get on the board.</p>}
         </div>
       </div>
+      </>}
     </div></div></section>
   )
 }

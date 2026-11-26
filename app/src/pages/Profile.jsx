@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Navigate, useParams } from 'react-router'
 import { Link } from '../components/NavLinks'
 import Avatar from '../components/Avatar'
+import Loader from '../components/Loader'
 import CountUp from '../components/CountUp'
 import Dish from '../components/Dish'
 import { BackIcon, CameraIcon, CheckIcon, HeartIcon, LockIcon, LogOutIcon, PencilIcon } from '../components/icons'
@@ -44,7 +45,7 @@ export function UserProfile() {
   const { data, error, loading } = useQuery(() => fetchPublicProfile(id, uid), [id, uid])
 
   if (uid && id === uid) return <Navigate to="/profile" replace />
-  if (loading && !data) return <section className="view" />
+  if (loading && !data) return <section className="view"><Loader label="Loading profile" /></section>
   if (error || !data) {
     return (
       <section className="view"><div className="band"><div className="wrap narrow">
@@ -95,6 +96,7 @@ function OwnProfile({ uid, email, profile }) {
     }
   }
 
+  if (!data) return <section className="view"><Loader label="Loading your profile" /></section>
   return (
     <ProfileBody
       head={<>
