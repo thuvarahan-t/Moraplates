@@ -1,0 +1,181 @@
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router'
+import { supabase } from '../lib/supabase'
+import { useAuth } from '../lib/auth'
+import { centreOf, useFx } from '../lib/fx'
+import { compressImage, uploadPhoto } from '../lib/photos'
+import { SAMPLE_CANTEENS, SAMPLE_FOODS } from '../data/sample'
+import { CameraIcon, CloseIcon } from './icons'
+
+const NEW = '__new'
+const RATINGS = [['super', 's', 'Super', 'Would eat again'], ['okay', 'o', 'Okay', "It's fine"], ['avoid', 'a', 'Avoid', 'Skip it']]
+
+async function loadMenu() {
+  if (!supabase) return { canteens: SAMPLE_CANTEENS, foods: SAMPLE_FOODS }
+  const [c, f] = await Promise.all([
+    supabase.from('canteens').select('id, name').order('name'),
+    supabase.from('foods').select('id, canteen_id, name, price').order('name'),
+  ])
+  if (c.error || f.error) throw c.error || f.error
+  return { canteens: c.data, foods: f.data.map(x => ({ id: x.id, canteenId: x.canteen_id, name: x.name, price: x.price })) }
+}
+
+/** Turns Supabase errors into something a student can act on. */
+function friendly(e) {
+  if (e?.code === '42501' || /row-level security/i.test(e?.message ?? '')) return 'Only @uom.lk accounts can post.'
+  if (e?.code === '23505') return 'That food is already on the menu. Pick it from the list.'
+  return e?.message || 'Something went wrong. Try again.'
+}
+
+export default function PostDialog({ request, onClose, onPosted }) {
+  const dlg = useRef(null)
+  const submitBtn = useRef(null)
+  const navigate = useNavigate()
+  const { session } = useAuth()
+  const { toast, confetti } = useFx()
+
+  const [menu, setMenu] = useState(null)
+  const [canteenId, setCanteenId] = useState(request.canteenId)
+  const [foodId, setFoodId] = useState(request.foodId)
+  const [newName, setNewName] = useState('')
+  const [newPrice, setNewPrice] = useState('')
+  const [rating, setRating] = useState('super')
+  const [caption, setCaption] = useState('')
+  const [photo, setPhoto] = useState(null)
+  const [preview, setPreview] = useState(null)
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  // Signed out: send them to sign in instead of letting them fill in a form they can't submit.
+  const needsSignIn = supabase && !session
+  useEffect(() => {
+    if (!needsSignIn) return
+    onClose()
+    navigate('/welcome')
+    toast('Sign in with your @uom.lk email to post')
+  }, [needsSignIn, onClose, navigate, toast])
+
+  useEffect(() => {
+    if (needsSignIn) return
+    dlg.current?.showModal()
+    loadMenu().then(setMenu).catch(e => { console.error(e); setErr("Couldn't load the menu. Check your connection.") })
+  }, [needsSignIn])
+
+  // Default to the first canteen, and to its first food (or "add new" when it has none).
+  const cid = canteenId ?? menu?.canteens[0]?.id
+  const foods = menu?.foods.filter(f => f.canteenId === cid) ?? []
+  const fid = foodId && (foodId === NEW || foods.some(f => f.id === foodId)) ? foodId : foods[0]?.id ?? NEW
+
+  useEffect(() => () => preview && URL.revokeObjectURL(preview), [preview])
+
+  if (needsSignIn) return null
+
+  const pickPhoto = e => {
+    const f = e.target.files?.[0]
+    if (!f) return
+    setPhoto(f)
+    setPreview(URL.createObjectURL(f))
+    setErr('')
+  }
+
+  const submit = async e => {
+    e.preventDefault()
+    if (!photo) return setErr('Add a photo of your plate.')
+    const price = Math.round(+newPrice)
+    if (fid === NEW) {
+      if (!newName.trim()) return setErr('Enter the food name.')
+      if (!(price > 0 && price <= 5000)) return setErr('Enter a price between Rs 1 and Rs 5000.')
+    }
+    if (!supabase) return setErr('Posting needs a Supabase project. Add keys to .env.')
+
+    setBusy(true)
+    setErr('')
+    try {
+      const path = await uploadPhoto(session.user.id, await compressImage(photo))
+      let foodRow = fid
+      if (fid === NEW) {
+        const { data, error } = await supabase.from('foods').insert({ canteen_id: cid, name: newName.trim(), price }).select('id').single()
+        if (error) throw error
+        foodRow = data.id
+      }
+      const { error } = await supabase.from('posts').insert({ canteen_id: cid, food_id: foodRow, rating, caption: caption.trim(), photo_path: path })
+      if (error) throw error
+
+      const [x, y] = centreOf(submitBtn.current)
+      confetti(x, y, 26)
+      onPosted()
+      onClose()
+      navigate('/')
+      toast('Plate posted to the feed')
+    } catch (e2) {
+      console.error(e2)
+      setErr(friendly(e2))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <dialog id="dlg" ref={dlg} aria-labelledby="dlgT" onClose={onClose} onClick={e => e.target === dlg.current && dlg.current.close()}>
+      <form id="pf" noValidate onSubmit={submit}>
+        <div className="dh">
+          <h2 id="dlgT">Post your plate</h2>
+          <button type="button" className="x" aria-label="Close" onClick={() => dlg.current.close()}>
+            <CloseIcon />
+          </button>
+        </div>
+
+        <label className="pick">
+          {preview ? <><img src={preview} alt="Your plate" /><span className="chg">Change photo</span></> : <><CameraIcon /><span>Add a photo of your plate</span></>}
+          <input type="file" accept="image/*" onChange={pickPhoto} aria-label="Photo of your plate" />
+        </label>
+
+        <fieldset>
+          <legend>Where did you eat?</legend>
+          <div className="seg">
+            {menu?.canteens.map(c => (
+              <label key={c.id}>
+                <input type="radio" name="pc" value={c.id} checked={c.id === cid} onChange={() => { setCanteenId(c.id); setFoodId(null); setErr('') }} />
+                <span>{c.name}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <label className="fl">
+          <span>What did you eat?</span>
+          <select value={fid} onChange={e => { setFoodId(e.target.value); setErr('') }}>
+            {foods.map(f => <option key={f.id} value={f.id}>{f.name} · Rs {f.price}</option>)}
+            <option value={NEW}>+ Add a new food</option>
+          </select>
+        </label>
+        {fid === NEW && (
+          <div className="newf">
+            <label className="fl"><span>Food name</span><input maxLength={40} placeholder="Cheese kottu" value={newName} onChange={e => { setNewName(e.target.value); setErr('') }} /></label>
+            <label className="fl"><span>Price (Rs)</span><input type="number" min="1" max="5000" inputMode="numeric" placeholder="450" value={newPrice} onChange={e => { setNewPrice(e.target.value); setErr('') }} /></label>
+          </div>
+        )}
+
+        <fieldset>
+          <legend>How was it?</legend>
+          <div className="seg rate">
+            {RATINGS.map(([v, cls, label, sub]) => (
+              <label key={v} className={cls}>
+                <input type="radio" name="pr" value={v} checked={rating === v} onChange={() => setRating(v)} />
+                <span>{label}<small>{sub}</small></span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <label className="fl">
+          <span>Say something <em>{caption.length}/160</em></span>
+          <textarea maxLength={160} rows={3} placeholder="Spicy? Cold? Worth the queue?" value={caption} onChange={e => setCaption(e.target.value)} />
+        </label>
+
+        <p className="err" role="alert">{err}</p>
+        <button className="btn wide" type="submit" ref={submitBtn} disabled={busy || !menu}>{busy ? 'Posting…' : 'Post to feed'}</button>
+      </form>
+    </dialog>
+  )
+}
