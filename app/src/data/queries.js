@@ -78,7 +78,8 @@ export async function addComment(postId, body) {
 }
 export async function deleteComment(id) {
   need()
-  check(await supabase.from('comments').delete().eq('id', id))
+  const rows=check(await supabase.from('comments').delete().eq('id', id).select('id'))
+  if(!rows.length)throw new Error('Comment not found or not yours.')
 }
 
 // ---------------------------------------------------------------- canteens, foods, votes

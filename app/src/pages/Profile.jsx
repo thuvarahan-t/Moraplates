@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import People from '../components/People'
 import CropPhoto from '../components/CropPhoto'
+import { useAdmin } from '../lib/useAdmin'
 import { samplePosts } from '../data/feed'
 import { Navigate, useNavigate, useParams } from 'react-router'
 import { Link } from '../components/NavLinks'
@@ -28,7 +29,7 @@ export default function Profile() {
   if (!supabase || !session) {
     return (
       <section className="view"><div className="band"><div className="wrap narrow">
-        <People />
+        <People searchOnly />
         <div className="card empty rise">
           <h3>You're browsing as a guest</h3>
           <p>Sign in with your university email to post plates, vote and collect badges.</p>
@@ -75,6 +76,7 @@ export function UserProfile() {
 
 function OwnProfile({ uid, email, profile }) {
   const { signOut, refreshProfile } = useAuth()
+  const admin=useAdmin()
   const { openPost } = usePost()
   const { toast } = useFx()
   const navigate = useNavigate()
@@ -139,7 +141,7 @@ function OwnProfile({ uid, email, profile }) {
       posts={data?.posts}
       platesTitle="Your plates"
       emptyPlates="No plates yet. Tap + to post your first one."
-      after={<button className="btn ghost sm signout" onClick={leave}><LogOutIcon />Sign out</button>}
+      after={<div className="cacts">{admin.allowed&&<Link className="btn sm" to="/admin">Admin console</Link>}<button className="btn ghost sm signout" onClick={leave}><LogOutIcon />Sign out</button></div>}
     />
   )
 }
@@ -150,7 +152,7 @@ function ProfileBody({ top, head, below, extra, stats: s, posts, platesTitle, em
   return (
     <section className="view"><div className="band"><div className="wrap">
       {top}
-      <Link className="search people-search-link" to="/people">Search students and foodies</Link>
+      <People searchOnly />
       <div className="card pro rise">{head}</div>
       {below}
 

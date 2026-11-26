@@ -30,7 +30,7 @@ export default function PostCard({ post, canteen, index = 0, onLike, onSeen, onD
     let timer
     const observer = new IntersectionObserver(entries => {
       clearTimeout(timer)
-      if (entries[0]?.isIntersecting && document.visibilityState === 'visible') {
+      if (entries[0]?.isIntersecting && entries[0].intersectionRatio >= 0.4 && document.visibilityState === 'visible') {
         timer = setTimeout(() => { if (document.visibilityState === 'visible') { onSeen(post.id); observer.disconnect() } }, 900)
       }
     },{threshold:0.4})

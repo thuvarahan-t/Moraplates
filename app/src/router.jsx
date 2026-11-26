@@ -9,6 +9,7 @@ import Top from './pages/Top'
 import Profile, { UserProfile } from './pages/Profile'
 import PeoplePage from './pages/PeoplePage'
 import PostDetail from './pages/PostDetail'
+import Admin from './pages/Admin'
 
 export const router = createBrowserRouter([
   {
@@ -25,6 +26,7 @@ export const router = createBrowserRouter([
       { path: 'u/:id', element: <UserProfile /> },
       { path: 'people', element: <PeoplePage /> },
       { path: 'posts/:id', element: <PostDetail /> },
+      { path: 'admin', element: <Admin /> },
       // The feed lives on the landing page; keep old /feed links working.
       { path: 'feed', element: <Navigate to="/" replace /> },
       { path: '*', element: <Navigate to="/" replace /> },
