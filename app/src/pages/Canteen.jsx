@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router'
 import { Link } from '../components/NavLinks'
 import CountUp from '../components/CountUp'
+import Loader from '../components/Loader'
 import Dish from '../components/Dish'
 import MapView, { locate } from '../components/MapView'
 import PostCard from '../components/PostCard'
@@ -38,7 +39,7 @@ export default function Canteen() {
   useEffect(() => { if (data) setPosts(data.posts) }, [data])
   const toggleLike = useLikeToggle(postsRef, setPosts)
 
-  if (loading && !data) return <section className="view"><div className="band"><div className="wrap"><Back /></div></div></section>
+  if (loading && !data) return <section className="view"><div className="band"><div className="wrap"><Back /><Loader label="Loading canteen" /></div></div></section>
   if (error || !data) {
     return (
       <section className="view"><div className="band"><div className="wrap">

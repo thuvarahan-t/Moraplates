@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router'
 import { Link } from '../components/NavLinks'
 import MapView from '../components/MapView'
 import CanteenThumb, { firstPhotoByCanteen } from '../components/CanteenThumb'
+import Loader from '../components/Loader'
 import { LocationIcon, MapIcon, PlusIcon, SearchIcon } from '../components/icons'
 import { useHomeData } from '../data/useHomeData'
 import { useQuery } from '../data/useQuery'
@@ -66,6 +67,7 @@ export default function Canteens() {
         </div>
       )}
 
+      {loading && <Loader label="Loading canteens" />}
       <div className={'clist' + (quiet ? ' noanim' : '')}>
         {matches.length > 0 && (
           <div className="card found rise">

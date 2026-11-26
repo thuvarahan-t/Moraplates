@@ -4,9 +4,12 @@ import Header from './components/Header'
 import BottomNav from './components/BottomNav'
 import { useTilt } from './lib/useTilt'
 import { PostProvider } from './lib/post'
+import { useAuth } from './lib/auth'
+import Loader from './components/Loader'
 
 export default function Layout() {
   const { pathname } = useLocation()
+  const { ready } = useAuth()
   useTilt()
   useLayoutEffect(() => { window.scrollTo(0, 0) }, [pathname])
 
@@ -14,7 +17,7 @@ export default function Layout() {
     <PostProvider>
       <Header />
       {/* Keyed by path so each view remounts and replays its entrance animation. */}
-      <main><Fragment key={pathname}><Outlet /></Fragment></main>
+      <main>{ready ? <Fragment key={pathname}><Outlet /></Fragment> : <Loader />}</main>
       <BottomNav />
     </PostProvider>
   )

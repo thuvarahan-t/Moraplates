@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import PostCard from './PostCard'
+import Loader from './Loader'
 import { useFeed } from '../data/feed'
 import { usePost } from '../lib/post'
 
@@ -28,6 +29,7 @@ export default function FeedSection({ canteens }) {
         <span className="sp" />
         {SORTS.map(([id, n]) => chip(sort === id, n, () => setSort(id)))}
       </div>
+      {loading && <Loader label="Loading plates" />}
       {/* Keyed so the cards replay their staggered rise whenever the filter or sort changes. */}
       <div className="posts" key={filter + sort}>
         {list.map((p, i) => <PostCard key={p.id} post={p} canteen={byId[p.canteenId]} index={i} onLike={toggleLike} />)}
