@@ -1,7 +1,7 @@
 // App icons, all from Lucide (https://lucide.dev) so strokes, corners and sizes match.
 import {
   ArrowLeft, Camera, Check, ChevronRight, Clock, Crown, Flame, Heart, LocateFixed, Lock, LogOut,
-  Mail, Map as MapLucide, MessageCircle, Pencil, Plus, Search, Sparkles, Store, Trophy, UserRound,
+  Mail, MapPin, Map as MapLucide, MessageCircle, Pencil, Plus, Search, Sparkles, Store, Trophy, UserRound,
   Trash2, Utensils, X,
 } from 'lucide-react'
 
@@ -24,6 +24,7 @@ export const SparkIcon = icon(Sparkles, { size: 22 })
 export const MailIcon = icon(Mail, { size: 22 })
 export const CommentIcon = icon(MessageCircle)
 export const PinIcon = icon(LocateFixed, { size: 18 })
+export const LocationIcon = icon(MapPin, { size: 14 })
 export const MapIcon = icon(MapLucide, { size: 18 })
 export const UserIcon = icon(UserRound, { size: 22 })
 export const CameraIcon = icon(Camera, { size: 28 })
