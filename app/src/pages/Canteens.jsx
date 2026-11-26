@@ -2,8 +2,12 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { Link } from '../components/NavLinks'
 import MapView from '../components/MapView'
-import { MapIcon, PlusIcon, SearchIcon } from '../components/icons'
+import CanteenThumb, { firstPhotoByCanteen } from '../components/CanteenThumb'
+import { LocationIcon, MapIcon, PlusIcon, SearchIcon } from '../components/icons'
 import { useHomeData } from '../data/useHomeData'
+import { useQuery } from '../data/useQuery'
+import { fetchCanteenPhotos } from '../data/queries'
+import { supabase } from '../lib/supabase'
 import { byVotes, hourLabel, isOpen, ratingChip, superPercent } from '../lib/food'
 import { useSignInGate } from '../lib/useSignInGate'
 import { plural } from '../lib/format'
@@ -20,9 +24,9 @@ export default function Canteens() {
   const [sort, setSort] = useState('votes')
   const [quiet, setQuiet] = useState(false) // typing re-renders without replaying the rise animation
   const [showMap, setShowMap] = useState(false)
+  const { data: photos } = useQuery(() => (supabase ? fetchCanteenPhotos(null, 150) : Promise.resolve([])), [])
+  const thumbs = firstPhotoByCanteen(photos)
 
-  const ranked = [...canteens].sort(byVotes)
-  const rankOf = id => ranked.findIndex(c => c.id === id) + 1
   const max = Math.max(1, ...canteens.map(c => c.votes))
   const minPrice = c => Math.min(...foods.filter(f => f.canteenId === c.id).map(f => f.price))
   const nameOf = id => canteens.find(c => c.id === id)?.name ?? ''
@@ -30,7 +34,7 @@ export default function Canteens() {
   const term = q.trim().toLowerCase()
   const matches = term ? foods.filter(f => f.name.toLowerCase().includes(term)).sort((a, b) => superPercent(b) - superPercent(a)) : []
   let list = sort === 'open' ? canteens.filter(isOpen) : [...canteens]
-  list.sort(sort === 'cheap' ? (a, b) => minPrice(a) - minPrice(b) : byVotes)
+  list.sort(sort === 'cheap' ? (a, b) => (minPrice(a) - minPrice(b)) || 0 : byVotes) // empty menus sort last
   if (term) list = list.filter(c => c.name.toLowerCase().includes(term) || matches.some(f => f.canteenId === c.id))
 
   const pins = canteens.filter(c => c.lat != null).map(c => ({ id: c.id, lat: c.lat, lng: c.lng, label: c.name }))
@@ -77,13 +81,14 @@ export default function Canteens() {
           </div>
         )}
         {list.map((c, i) => {
-          const r = rankOf(c.id), open = isOpen(c)
+          const open = isOpen(c)
           return (
             <Link key={c.id} className="card ccard rise tilt" to={`/canteens/${c.id}`} style={{ '--i': i, '--cc': c.colour }}>
-              <span className={'rank' + (r === 1 && c.votes > 0 ? ' r1' : '')}>{r}</span>
+              <CanteenThumb canteen={c} photo={thumbs[c.id]} />
               <div className="cb">
                 <div className="row"><span className="cn">{c.name}</span><span className="vt"><b>{c.votes}</b> {c.votes === 1 ? 'vote' : 'votes'}</span></div>
-                <small>{c.knownFor ? `Known for ${c.knownFor.toLowerCase()} · ` : ''}{c.location}</small>
+                {c.knownFor && <small>Known for {c.knownFor.toLowerCase()}</small>}
+                <small className="loc"><LocationIcon />{c.location}</small>
                 <div><span className={'open ' + (open ? 'y' : 'n')}>{open ? 'Open now' : 'Closed'} · {hourLabel(c.opensAt)} to {hourLabel(c.closesAt)}</span></div>
                 <div className="bar"><i style={{ '--w': Math.round((c.votes / max) * 100) + '%' }} /></div>
               </div>

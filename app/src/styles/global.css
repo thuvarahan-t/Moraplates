@@ -383,3 +383,9 @@ main{padding-bottom:clamp(24px,4vw,48px)}
 .pinit .si{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:var(--ob);color:var(--ot);flex:none}
 .pinit>div{flex:1 1 160px}.pinit b{display:block}.pinit small{color:var(--mut);font-size:13px}
 .pinit-open{gap:10px}.pinit-open .err{padding:0 6px}.pinit-open .cacts{padding:0 6px 6px}
+/* Canteen cards: thumbnail instead of rank number */
+.cthumb{position:relative;flex:none;border-radius:16px;overflow:hidden;background:var(--soft);box-shadow:inset 0 0 0 1px var(--line)}
+.cthumb img{display:block;width:100%;height:100%;object-fit:cover}
+.cthumb .dish{width:100%;height:100%;aspect-ratio:auto}.cthumb .dish i{width:74%;box-shadow:0 8px 12px -8px rgba(70,20,28,.45)}
+.ccard{align-items:center}
+.cb .loc{display:inline-flex;align-items:center;gap:4px}.cb .loc .ic{color:var(--tomt)}
