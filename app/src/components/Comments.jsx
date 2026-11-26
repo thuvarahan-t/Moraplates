@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
-import { useAuth, initialsOf } from '../lib/auth'
+import { useAuth } from '../lib/auth'
+import { Link } from './NavLinks'
+import Avatar from './Avatar'
 import { useFx } from '../lib/fx'
 import { useSignInGate } from '../lib/useSignInGate'
 import { addComment, deleteComment, fetchComments, friendly } from '../data/queries'
-import { avatarStyle, timeAgo } from '../lib/format'
+import { timeAgo } from '../lib/format'
 
 /** Comment thread under a post. Loads when opened. `onCount` reports +1 / -1 changes. */
 export default function Comments({ postId, onCount }) {
@@ -51,9 +53,9 @@ export default function Comments({ postId, onCount }) {
       {list?.length === 0 && <small className="cm-empty">No comments yet. Say something.</small>}
       {list?.map(c => (
         <div className="cm" key={c.id}>
-          <span className="av" style={avatarStyle(c.author)}>{initialsOf(c.author)}</span>
+          <Link to={`/u/${c.userId}`} aria-label={`${c.author}'s profile`}><Avatar name={c.author} url={c.avatar} /></Link>
           <div>
-            <b>{c.author}</b><small>{timeAgo(c.createdAt)}</small>
+            <Link className="cm-name" to={`/u/${c.userId}`}>{c.author}</Link><small>{timeAgo(c.createdAt)}</small>
             <p>{c.body}</p>
             {c.userId === session?.user?.id && <button className="cm-del" onClick={() => remove(c.id)}>Delete</button>}
           </div>
