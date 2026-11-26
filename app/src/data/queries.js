@@ -154,14 +154,16 @@ export async function deleteCanteenPhoto(photo) {
 
 // ---------------------------------------------------------------- top + profile
 
-export async function fetchTop() {
+export async function fetchTop(viewerId) {
   need()
-  const [c, f, p] = await Promise.all([
+  const [c, f, p, vote, photos] = await Promise.all([
     supabase.from('canteen_standings').select('*').order('votes_this_week', { ascending: false }),
     supabase.from('food_stats').select('*'),
     supabase.from('profile_stats').select('user_id, full_name, plates').gt('plates', 0).order('plates', { ascending: false }).limit(4),
+    viewerId ? supabase.rpc('my_vote') : Promise.resolve({ data: null }),
+    fetchCanteenPhotos(null, 150),
   ])
-  return { canteens: check(c).map(toCanteen), foods: check(f).map(toFood), foodies: check(p) }
+  return { canteens: check(c).map(toCanteen), foods: check(f).map(toFood), foodies: check(p), myVote: check(vote), photos }
 }
 
 export async function fetchProfilePage(userId) {
