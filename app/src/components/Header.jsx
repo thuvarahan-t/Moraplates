@@ -52,7 +52,7 @@ export default function Header() {
         {supabase && !session && <Link className="btn sm ghost" to="/welcome">Sign in</Link>}
         <button className="btn sm" onClick={openPost}><PlusIcon />Post your plate</button>
         <Link className="me" to={profile ? '/profile' : '/welcome'} aria-label={profile ? 'Your profile' : 'Sign in'}>
-          {profile ? initialsOf(profile.fullName) : <UserIcon />}
+          {profile?.avatar ? <img src={profile.avatar} alt="" /> : profile ? initialsOf(profile.fullName) : <UserIcon />}
         </Link>
       </div>
     </header>
