@@ -6,6 +6,7 @@ import { centreOf, useFx } from '../lib/fx'
 import { compressImage, uploadPhoto } from '../lib/photos'
 import { SAMPLE_CANTEENS, SAMPLE_FOODS } from '../data/sample'
 import { CameraIcon, CloseIcon } from './icons'
+import Dropdown from './Dropdown'
 
 const NEW = '__new'
 const RATINGS = [['super', 's', 'Super', 'Would eat again'], ['okay', 'o', 'Okay', "It's fine"], ['avoid', 'a', 'Avoid', 'Skip it']]
@@ -13,11 +14,11 @@ const RATINGS = [['super', 's', 'Super', 'Would eat again'], ['okay', 'o', 'Okay
 async function loadMenu() {
   if (!supabase) return { canteens: SAMPLE_CANTEENS, foods: SAMPLE_FOODS }
   const [c, f] = await Promise.all([
-    supabase.from('canteens').select('id, name').order('name'),
+    supabase.from('canteens').select('id, name, location, colour').order('name'),
     supabase.from('foods').select('id, canteen_id, name, price').order('name'),
   ])
   if (c.error || f.error) throw c.error || f.error
-  return { canteens: c.data, foods: f.data.map(x => ({ id: x.id, canteenId: x.canteen_id, name: x.name, price: x.price })) }
+  return { canteens: c.data.map(x => ({ id: x.id, name: x.name, location: x.location, colour: x.colour })), foods: f.data.map(x => ({ id: x.id, canteenId: x.canteen_id, name: x.name, price: x.price })) }
 }
 
 /** Turns Supabase errors into something a student can act on. */
@@ -130,26 +131,27 @@ export default function PostDialog({ request, onClose, onPosted }) {
           <input type="file" accept="image/*" onChange={pickPhoto} aria-label="Photo of your plate" />
         </label>
 
-        <fieldset>
-          <legend>Where did you eat?</legend>
-          <div className="seg">
-            {!menu && !err && <span className="seg-wait">Loading canteens…</span>}
-            {menu?.canteens.map(c => (
-              <label key={c.id}>
-                <input type="radio" name="pc" value={c.id} checked={c.id === cid} onChange={() => { setCanteenId(c.id); setFoodId(null); setErr('') }} />
-                <span>{c.name}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
+        <div className="fl">
+          <span id="pf-canteen">Where did you eat?</span>
+          <Dropdown
+            labelId="pf-canteen" value={cid} disabled={!menu}
+            placeholder={err ? 'Canteens unavailable' : 'Loading canteens…'}
+            options={(menu?.canteens ?? []).map(c => ({ value: c.id, label: c.name, sub: c.location, dot: c.colour }))}
+            onChange={v => { setCanteenId(v); setFoodId(null); setErr('') }}
+          />
+        </div>
 
-        <label className="fl">
-          <span>What did you eat?</span>
-          <select value={fid} onChange={e => { setFoodId(e.target.value); setErr('') }}>
-            {foods.map(f => <option key={f.id} value={f.id}>{f.name} · Rs {f.price}</option>)}
-            <option value={NEW}>+ Add a new food</option>
-          </select>
-        </label>
+        <div className="fl">
+          <span id="pf-food">What did you eat?</span>
+          <Dropdown
+            labelId="pf-food" value={fid} disabled={!menu}
+            options={[
+              ...foods.map(f => ({ value: f.id, label: f.name, sub: 'Rs ' + f.price })),
+              { value: NEW, label: '+ Add a new food', sub: foods.length ? 'Not on the list? Add it' : 'No foods here yet. Add the first one' },
+            ]}
+            onChange={v => { setFoodId(v); setErr('') }}
+          />
+        </div>
         {fid === NEW && (
           <div className="newf">
             <label className="fl"><span>Food name</span><input maxLength={40} placeholder="Cheese kottu" value={newName} onChange={e => { setNewName(e.target.value); setErr('') }} /></label>
