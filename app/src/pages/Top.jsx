@@ -1,16 +1,22 @@
+import { useState } from 'react'
 import { Link } from '../components/NavLinks'
-import { CrownIcon } from '../components/icons'
-import { initialsOf } from '../lib/auth'
+import CanteenThumb, { firstPhotoByCanteen } from '../components/CanteenThumb'
+import { CheckIcon, CrownIcon, HeartIcon } from '../components/icons'
+import { initialsOf, useAuth } from '../lib/auth'
 import { avatarStyle, plural } from '../lib/format'
 import { superPercent, totalRatings } from '../lib/food'
+import { centreOf, useFx } from '../lib/fx'
+import { useSignInGate } from '../lib/useSignInGate'
 import { useQuery } from '../data/useQuery'
-import { fetchTop } from '../data/queries'
+import { castVote, fetchTop, friendly, removeVote } from '../data/queries'
 
 const MIN_RATINGS = 3 // a dish needs this many ratings to rank
 
 /** Podium, top dishes, top foodies (renderTop() in index.html). */
 export default function Top() {
-  const { data, error } = useQuery(fetchTop, [])
+  const { session } = useAuth()
+  const uid = session?.user?.id
+  const { data, error, reload } = useQuery(() => fetchTop(uid), [uid])
   const canteens = data?.canteens ?? []
   const dishes = (data?.foods ?? []).filter(f => totalRatings(f) >= MIN_RATINGS)
     .sort((a, b) => superPercent(b) - superPercent(a) || totalRatings(b) - totalRatings(a)).slice(0, 5)
@@ -23,6 +29,7 @@ export default function Top() {
     <section className="view"><div className="band"><div className="wrap">
       <div className="vh"><div><h2>Top this week</h2><p>Votes reset every Monday at 8am.</p></div></div>
       {error && <div className="card empty"><h3>Couldn't load the rankings</h3><p>Check your connection and try again.</p></div>}
+      {data && <VoteBoard canteens={canteens} myVote={data.myVote} photos={data.photos} onVoted={reload} />}
 
       <div className="podium">
         {podium.map(([c, n, h, d]) => (
@@ -63,5 +70,58 @@ export default function Top() {
         </div>
       </div>
     </div></div></section>
+  )
+}
+
+/** One-tap voting for any canteen. Tapping your current vote takes it back. */
+function VoteBoard({ canteens, myVote, photos, onVoted }) {
+  const { toast, confetti } = useFx()
+  const gate = useSignInGate()
+  const [busy, setBusy] = useState(null)
+  const thumbs = firstPhotoByCanteen(photos)
+  const list = [...canteens].sort((a, b) => a.name.localeCompare(b.name)) // stable order while votes move
+
+  const vote = async (c, e) => {
+    if (busy || !gate('to vote')) return
+    const btn = e.currentTarget
+    setBusy(c.id)
+    try {
+      if (myVote === c.id) {
+        await removeVote()
+        toast('Vote removed')
+      } else {
+        await castVote(c.id)
+        const [x, y] = centreOf(btn)
+        confetti(x, y, 20)
+        toast('You voted for ' + c.name)
+      }
+      onVoted()
+    } catch (err) {
+      toast(friendly(err))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  return (
+    <div className="card vboard rise">
+      <div className="mh"><h3>Vote your favourite</h3><span>One vote a week · tap again to take it back</span></div>
+      <div className="vlist">
+        {list.map(c => {
+          const mine = myVote === c.id
+          return (
+            <div key={c.id} className={'vrow' + (mine ? ' mine' : '')}>
+              <Link to={`/canteens/${c.id}`} className="vlink">
+                <CanteenThumb canteen={c} photo={thumbs[c.id]} size={52} />
+                <span className="vi"><b>{c.name}</b><small>{plural(c.votes, 'vote')} this week</small></span>
+              </Link>
+              <button className={'btn sm' + (mine ? ' voted' : '')} aria-pressed={mine} disabled={busy === c.id} onClick={e => vote(c, e)}>
+                {mine ? <><CheckIcon />Voted</> : <><HeartIcon />Vote</>}
+              </button>
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
