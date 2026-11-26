@@ -24,7 +24,7 @@ export function friendly(e) {
 
 // ---------------------------------------------------------------- posts
 
-const POST_FIELDS = 'id, user_id, canteen_id, rating, caption, photo_path, created_at, author:profiles!posts_user_id_fkey(full_name, faculty), food:foods(name, price), likes(count), comments(count)'
+const POST_FIELDS = 'id, user_id, canteen_id, rating, caption, photo_path, created_at, author:profiles!posts_user_id_fkey(full_name, faculty, avatar_path), food:foods(name, price), likes(count), comments(count)'
 
 /** Latest posts, optionally for one canteen or one author, with the viewer's likes. */
 export async function fetchPosts(viewerId, { canteenId, authorId, limit = 60 } = {}) {
@@ -47,7 +47,7 @@ export async function fetchPosts(viewerId, { canteenId, authorId, limit = 60 } =
     caption: r.caption,
     photo: photoUrl(r.photo_path),
     createdAt: Date.parse(r.created_at),
-    author: { name: r.author?.full_name ?? 'Student', faculty: r.author?.faculty },
+    author: { name: r.author?.full_name ?? 'Student', faculty: r.author?.faculty, avatar: photoUrl(r.author?.avatar_path) },
     food: { name: r.food.name, price: r.food.price },
     likes: r.likes[0]?.count ?? 0,
     comments: r.comments[0]?.count ?? 0,
@@ -67,9 +67,9 @@ export async function setLike(postId, userId, liked) {
 export async function fetchComments(postId) {
   need()
   const rows = check(await supabase.from('comments')
-    .select('id, user_id, body, created_at, author:profiles(full_name)')
+    .select('id, user_id, body, created_at, author:profiles(full_name, avatar_path)')
     .eq('post_id', postId).order('created_at'))
-  return rows.map(r => ({ id: r.id, userId: r.user_id, body: r.body, createdAt: Date.parse(r.created_at), author: r.author?.full_name ?? 'Student' }))
+  return rows.map(r => ({ id: r.id, userId: r.user_id, body: r.body, createdAt: Date.parse(r.created_at), author: r.author?.full_name ?? 'Student', avatar: photoUrl(r.author?.avatar_path) }))
 }
 export async function addComment(postId, body) {
   need()
@@ -159,11 +159,11 @@ export async function fetchTop(viewerId) {
   const [c, f, p, vote, photos] = await Promise.all([
     supabase.from('canteen_standings').select('*').order('votes_this_week', { ascending: false }),
     supabase.from('food_stats').select('*'),
-    supabase.from('profile_stats').select('user_id, full_name, plates').gt('plates', 0).order('plates', { ascending: false }).limit(4),
+    supabase.from('profile_stats').select('user_id, full_name, avatar_path, plates').gt('plates', 0).order('plates', { ascending: false }).limit(4),
     viewerId ? supabase.rpc('my_vote') : Promise.resolve({ data: null }),
     fetchCanteenPhotos(null, 150),
   ])
-  return { canteens: check(c).map(toCanteen), foods: check(f).map(toFood), foodies: check(p), myVote: check(vote), photos }
+  return { canteens: check(c).map(toCanteen), foods: check(f).map(toFood), foodies: check(p).map(r => ({ ...r, avatar: photoUrl(r.avatar_path) })), myVote: check(vote), photos }
 }
 
 export async function fetchProfilePage(userId) {
@@ -176,6 +176,31 @@ export async function fetchProfilePage(userId) {
   const fav = check(vote)
   const favCanteen = fav ? check(await supabase.from('canteens').select('id, name').eq('id', fav).maybeSingle()) : null
   return { stats: check(stats), posts, favCanteen }
+}
+
+/** Someone else's profile: details, stats and plates. Votes stay private. */
+export async function fetchPublicProfile(userId, viewerId) {
+  need()
+  const [pr, stats, posts] = await Promise.all([
+    supabase.from('profiles').select('id, full_name, faculty, batch, avatar_path').eq('id', userId).maybeSingle(),
+    supabase.from('profile_stats').select('*').eq('user_id', userId).maybeSingle(),
+    fetchPosts(viewerId, { authorId: userId, limit: 60 }),
+  ])
+  const row = check(pr)
+  if (!row) return null
+  return {
+    profile: { id: row.id, fullName: row.full_name, faculty: row.faculty, batch: row.batch, avatar: photoUrl(row.avatar_path) },
+    stats: check(stats),
+    posts,
+  }
+}
+
+/** Uploads a new profile picture and removes the old file. */
+export async function updateAvatar(userId, file, oldPath) {
+  need()
+  const path = await uploadPhoto(userId, await compressImage(file, 600))
+  check(await supabase.from('profiles').update({ avatar_path: path }).eq('id', userId))
+  if (oldPath) await supabase.storage.from('photos').remove([oldPath])
 }
 
 export async function updateProfile(userId, { fullName, faculty, batch }) {
