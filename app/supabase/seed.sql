@@ -1,21 +1,13 @@
--- Placeholder canteens and menus from the design handoff (index.html).
--- Replace with real campus data before launch: names, locations and hours are not confirmed.
+-- University of Moratuwa canteens. Menus start empty: students add foods and prices in the app.
+-- Wala and Goda pins come from OpenStreetMap; students pin the rest from each canteen's page.
+-- Hours are placeholders (7am-6pm) until confirmed.
 
-insert into public.canteens (id, name, location, opens_at, closes_at, known_for, colour) values
-  ('it',     'IT canteen',     'Near the IT faculty',        7, 19, 'Chicken kottu',  '#E8492F'),
-  ('main',   'Main canteen',   'Beside the library',         7, 16, 'Rice and curry', '#E09A12'),
-  ('civil',  'Civil canteen',  'Civil faculty block',        7, 17, 'String hoppers', '#2F9E5B'),
-  ('juice',  'Juice bar',      'Near the ground',            9, 18, 'Faluda',         '#D4537E'),
-  ('hostel', 'Hostel canteen', 'Inside the hostel premises', 6, 22, 'Egg roti',       '#7F77DD');
-
-insert into public.foods (canteen_id, name, price, created_by) values
-  ('it', 'Chicken kottu', 450, null), ('it', 'Cheese kottu', 550, null),
-  ('it', 'Egg fried rice', 380, null), ('it', 'Fish bun', 80, null),
-  ('main', 'Rice and curry', 220, null), ('main', 'Veg rice and curry', 180, null),
-  ('main', 'Parata with dhal', 150, null),
-  ('civil', 'String hoppers', 200, null), ('civil', 'Pittu with curry', 190, null),
-  ('civil', 'Wade', 50, null),
-  ('juice', 'Faluda', 250, null), ('juice', 'Wood apple juice', 180, null),
-  ('juice', 'Lime juice', 120, null),
-  ('hostel', 'Egg roti', 120, null), ('hostel', 'Noodles', 300, null),
-  ('hostel', 'Plain tea', 40, null);
+insert into public.canteens (id, name, location, lat, lng, opens_at, closes_at, colour) values
+  ('wala',           'Wala Canteen',            'Wala',    6.796924, 79.899594, 7, 18, '#E8492F'),
+  ('goda',           'Goda Canteen',            'Goda',    6.796366, 79.900150, 7, 18, '#E09A12'),
+  ('goda-uda',       'Goda Uda Canteen',        'Goda',    null,     null,      7, 18, '#2F9E5B'),
+  ('goda-uda-staff', 'Goda Uda Staff Canteen',  'Goda',    null,     null,      7, 18, '#7F77DD'),
+  ('wala-uda',       'Wala Uda Canteen',        'Wala',    null,     null,      7, 18, '#D4537E'),
+  ('l-canteen',      'L Canteen',               'Campus',  null,     null,      7, 18, '#1F8A9E'),
+  ('civil',          'Civil Canteen',           'Civil faculty', null, null,    7, 18, '#C9853A'),
+  ('village',        'Village Canteen',         'Campus',  null,     null,      7, 18, '#6B1E2A');
