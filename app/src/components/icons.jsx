@@ -1,6 +1,6 @@
 // App icons, all from Lucide (https://lucide.dev) so strokes, corners and sizes match.
 import {
-  ArrowLeft, Camera, Check, ChevronDown, ChevronRight, Clock, Crown, Flame, Heart, LocateFixed, Lock, LogOut,
+  ArrowLeft, Camera, Check, ChefHat, ChevronDown, ChevronRight, Clock, Crown, Flame, Heart, LocateFixed, Lock, LogOut,
   Mail, MapPin, Map as MapLucide, MessageCircle, Pencil, Plus, Search, Sparkles, Store, Trophy, UserRound,
   Trash2, Utensils, X,
 } from 'lucide-react'
@@ -39,3 +39,5 @@ export const CrownIcon = icon(Crown, { size: 34 })
 export const LogOutIcon = icon(LogOut, { size: 18 })
 export const TrashIcon = icon(Trash2, { size: 18 })
 export const PencilIcon = icon(Pencil, { size: 16 })
+export const ChefHatIcon = icon(ChefHat, { size: 18 })
+export const ForkKnifeIcon = icon(Utensils, { size: 18 })
