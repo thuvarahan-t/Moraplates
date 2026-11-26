@@ -429,3 +429,4 @@ main{padding-bottom:clamp(24px,4vw,48px)}
 @keyframes ldQuote{from{opacity:0;transform:translateY(6px)}}
 .ld-quote blockquote{margin:0;font:600 17px/1.4 'Bricolage Grotesque',sans-serif;color:var(--brand)}
 .ld-quote figcaption{margin-top:6px;font-size:13px;color:var(--mut)}
+.seg-wait{color:var(--mut);font-size:14px;min-height:44px;display:flex;align-items:center}

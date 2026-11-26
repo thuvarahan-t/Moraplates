@@ -133,6 +133,7 @@ export default function PostDialog({ request, onClose, onPosted }) {
         <fieldset>
           <legend>Where did you eat?</legend>
           <div className="seg">
+            {!menu && !err && <span className="seg-wait">Loading canteens…</span>}
             {menu?.canteens.map(c => (
               <label key={c.id}>
                 <input type="radio" name="pc" value={c.id} checked={c.id === cid} onChange={() => { setCanteenId(c.id); setFoodId(null); setErr('') }} />
