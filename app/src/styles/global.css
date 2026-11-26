@@ -376,3 +376,5 @@ dialog#dlg[open]{animation:sheet .45s var(--spring)}
 .bnr-go{position:absolute;z-index:2;right:16px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:40px;height:40px;border-radius:50%;background:rgba(255,244,228,.18);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);transition:transform .3s var(--spring)}
 .bnr-slide:hover .bnr-go{transform:translateY(-50%) translateX(4px)}
 .bnr>.dots{bottom:16px;right:16px}
+/* No footer: give the last section breathing room above the page end */
+main{padding-bottom:clamp(24px,4vw,48px)}
