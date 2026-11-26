@@ -17,7 +17,7 @@ export function PostProvider({ children }) {
   const close = useCallback(() => setRequest(null), [])
   const posted = useCallback(() => setVersion(v => v + 1), [])
 
-  const value = useMemo(() => ({ openPost, version }), [openPost, version])
+  const value = useMemo(() => ({ openPost, version, invalidate: posted }), [openPost, version, posted])
   return (
     <PostContext.Provider value={value}>
       {children}

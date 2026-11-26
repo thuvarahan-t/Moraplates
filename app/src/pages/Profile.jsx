@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import People from '../components/People'
+import { samplePosts } from '../data/feed'
 import { Navigate, useNavigate, useParams } from 'react-router'
 import { Link } from '../components/NavLinks'
 import Avatar from '../components/Avatar'
@@ -25,6 +27,7 @@ export default function Profile() {
   if (!supabase || !session) {
     return (
       <section className="view"><div className="band"><div className="wrap narrow">
+        <People />
         <div className="card empty rise">
           <h3>You're browsing as a guest</h3>
           <p>Sign in with your university email to post plates, vote and collect badges.</p>
@@ -42,7 +45,7 @@ export function UserProfile() {
   const { id } = useParams()
   const { session } = useAuth()
   const uid = session?.user?.id
-  const { data, error, loading } = useQuery(() => fetchPublicProfile(id, uid), [id, uid])
+  const { data, error, loading } = useQuery(() => supabase ? fetchPublicProfile(id, uid) : Promise.resolve((() => { const posts=samplePosts().filter(p=>p.userId===id); const a=posts[0]?.author; return a ? {profile:{id,fullName:a.name,faculty:a.faculty},stats:{plates:posts.length},posts} : null })()), [id, uid])
 
   if (uid && id === uid) return <Navigate to="/profile" replace />
   if (loading && !data) return <section className="view"><Loader label="Loading profile" /></section>
@@ -79,7 +82,7 @@ function OwnProfile({ uid, email, profile }) {
     toast('Signed out. See you at lunch!')
     navigate('/welcome')
   }
-  const { data } = useQuery(() => fetchProfilePage(uid), [uid])
+  const { data, error, reload } = useQuery(() => fetchProfilePage(uid), [uid])
   const [editing, setEditing] = useState(false)
   const [uploading, setUploading] = useState(false)
   // New accounts start with the email name ("thuvarahant.23"); nudge them to set a real one.
@@ -102,6 +105,7 @@ function OwnProfile({ uid, email, profile }) {
     }
   }
 
+  if (error) return <section className="view"><div className="card empty"><h3>Couldn't load your profile</h3><button className="btn sm" onClick={reload}>Retry</button></div></section>
   if (!data) return <section className="view"><Loader label="Loading your profile" /></section>
   return (
     <ProfileBody
@@ -145,6 +149,7 @@ function ProfileBody({ top, head, below, extra, stats: s, posts, platesTitle, em
   return (
     <section className="view"><div className="band"><div className="wrap">
       {top}
+      <Link className="search people-search-link" to="/people">Search students and foodies</Link>
       <div className="card pro rise">{head}</div>
       {below}
 
@@ -175,7 +180,7 @@ function ProfileBody({ top, head, below, extra, stats: s, posts, platesTitle, em
         {posts?.map((p, i) => {
           const [rl, rc] = RATING[p.rating]
           return (
-            <Link key={p.id} className="card rise tilt" to={`/canteens/${p.canteenId}`} style={{ '--i': i, textDecoration: 'none', color: 'inherit' }}>
+            <Link key={p.id} className="card rise tilt" to={`/posts/${p.id}`} style={{ '--i': i, textDecoration: 'none', color: 'inherit' }}>
               {p.photo ? <img className="sq" src={p.photo} alt={p.food.name} loading="lazy" /> : <Dish name={p.food.name} />}
               <div className="mb"><span>{p.food.name}</span><span className={'rt ' + rc}>{rl}</span></div>
             </Link>

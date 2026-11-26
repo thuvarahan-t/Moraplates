@@ -13,6 +13,7 @@ export default function BottomNav() {
 
   useLayoutEffect(() => {
     const place = () => {
+      if (!bar.current || !pill.current) return
       const a = bar.current.querySelector('a[aria-current]')
       const el = pill.current
       if (!a) { el.style.opacity = '0'; return }
