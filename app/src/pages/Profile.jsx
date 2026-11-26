@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import People from '../components/People'
 import CropPhoto from '../components/CropPhoto'
 import { useAdmin } from '../lib/useAdmin'
@@ -17,7 +17,7 @@ import { RATING } from '../lib/format'
 import { usePost } from '../lib/post'
 import { supabase } from '../lib/supabase'
 import { useQuery } from '../data/useQuery'
-import { fetchProfilePage, fetchPublicProfile, friendly, updateAvatar, updateProfile } from '../data/queries'
+import { fetchPosts, fetchProfilePage, fetchPublicProfile, friendly, updateAvatar, updateProfile } from '../data/queries'
 
 const TONES = { leaf: ['var(--sb)', 'var(--st)'], mus: ['var(--ob)', 'var(--ot)'], tom: ['var(--ab)', 'var(--at)'] }
 
@@ -61,7 +61,9 @@ export function UserProfile() {
   const p = data.profile
   return (
     <ProfileBody
-      top={<button className="back linkish" onClick={() => history.back()}><BackIcon />Back</button>}
+      top={<Link className="back" to="/people"><BackIcon />Find foodies</Link>}
+      authorId={id}
+      viewerId={uid}
       head={<>
         <Avatar name={p.fullName} url={p.avatar} />
         <div className="who"><b>{p.fullName}</b><span style={{ color: 'var(--mut)' }}>{[p.faculty, p.batch].filter(Boolean).join(' · ') || 'Mora student'}</span></div>
@@ -138,6 +140,8 @@ function OwnProfile({ uid, email, profile }) {
         </Link>
       )}
       stats={data?.stats}
+      authorId={uid}
+      viewerId={uid}
       posts={data?.posts}
       platesTitle="Your plates"
       emptyPlates="No plates yet. Tap + to post your first one."
@@ -147,8 +151,19 @@ function OwnProfile({ uid, email, profile }) {
 }
 
 /** Layout shared by your own profile and other students' profiles. */
-function ProfileBody({ top, head, below, extra, stats: s, posts, platesTitle, emptyPlates, after }) {
+function ProfileBody({ top, head, below, extra, stats: s, posts, authorId, viewerId, platesTitle, emptyPlates, after }) {
   const badges = badgesFor(s)
+  const {toast}=useFx()
+  const [older,setOlder]=useState([])
+  const [hasMore,setHasMore]=useState(false)
+  const [busy,setBusy]=useState(false)
+  useEffect(()=>{setOlder([]);setHasMore(!!supabase&&posts?.length===60)},[posts])
+  const all=[...(posts??[]),...older]
+  const loadOlder=async()=>{
+    if(busy||!hasMore||!all.length)return
+    setBusy(true)
+    try{const rows=await fetchPosts(viewerId,{authorId,before:all.at(-1),limit:60});setOlder(old=>[...old,...rows.filter(r=>!all.some(p=>p.id===r.id))]);setHasMore(rows.length===60)}catch(e){toast(friendly(e))}finally{setBusy(false)}
+  }
   return (
     <section className="view"><div className="band"><div className="wrap">
       {top}
@@ -180,7 +195,7 @@ function ProfileBody({ top, head, below, extra, stats: s, posts, platesTitle, em
 
       <h3 className="sec">{platesTitle}</h3>
       <div className="mine">
-        {posts?.map((p, i) => {
+        {all.map((p, i) => {
           const [rl, rc] = RATING[p.rating]
           return (
             <Link key={p.id} className="card rise tilt" to={`/posts/${p.id}`} style={{ '--i': i, textDecoration: 'none', color: 'inherit' }}>
@@ -190,6 +205,7 @@ function ProfileBody({ top, head, below, extra, stats: s, posts, platesTitle, em
           )
         })}
       </div>
+      {hasMore&&<button className="btn ghost wide" onClick={loadOlder} disabled={busy}>{busy?'Loading…':'Load older plates'}</button>}
       {posts && !posts.length && <p style={{ color: 'var(--mut)' }}>{emptyPlates}</p>}
       {after}
     </div></div></section>

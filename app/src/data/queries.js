@@ -115,14 +115,15 @@ export async function addFood(canteenId, name, price) {
   check(await supabase.from('foods').insert({ canteen_id: canteenId, name, price }))
 }
 
-/** Creates a canteen; uploads its photo first when there is one. Returns the new id. */
+/** Creates a canteen; an optional gallery upload must not mask successful creation. */
 export async function addCanteen(userId, { name, location, lat, lng, opensAt, closesAt, knownFor, photo }) {
   need()
   const row = check(await supabase.from('canteens').insert({
     name, location, lat, lng, opens_at: opensAt, closes_at: closesAt, known_for: knownFor || null,
   }).select('id').single())
-  if (photo) await addCanteenPhoto(userId, row.id, photo)
-  return row.id
+  let photoError=false
+  if (photo) try{await addCanteenPhoto(userId,row.id,photo)}catch(e){console.warn(e);photoError=true}
+  return {id:row.id,photoError}
 }
 
 // ---------------------------------------------------------------- canteen photos
@@ -154,6 +155,7 @@ export async function deleteCanteenPhoto(photo) {
   if (!rows.length) throw new Error('Photo not found or not yours.')
   const { error } = await supabase.storage.from('photos').remove([photo.path])
   if (error) console.warn('Photo row deleted but file remains:', error.message)
+  return !error
 }
 
 // ---------------------------------------------------------------- top + profile

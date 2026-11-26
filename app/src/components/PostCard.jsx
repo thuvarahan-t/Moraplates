@@ -11,7 +11,7 @@ import { useAuth } from '../lib/auth'
 import { useFx } from '../lib/fx'
 import { usePost } from '../lib/post'
 import { deleteOwnPost, friendly } from '../data/queries'
-import { shareLink } from '../lib/share'
+import { shareLink, canteenMapLink } from '../lib/share'
 
 export default function PostCard({ post, canteen, index = 0, onLike, onSeen, onDeleted }) {
   const [label, cls] = RATING[post.rating] ?? ['Plate','']
@@ -67,7 +67,7 @@ export default function PostCard({ post, canteen, index = 0, onLike, onSeen, onD
         <button className={'like'+(post.liked?' on':'')+(post.liked&&pops?' pop':'')} aria-pressed={post.liked} aria-label={post.liked?'Unlike plate':'Like plate'} onClick={like}><HeartIcon key={pops}/><span>{post.likes}</span></button>
         <button className="like" aria-expanded={open} aria-label="Comments" onClick={()=>setOpen(v=>!v)}><CommentIcon/><span>{Math.max(0,(post.comments??0)+extra)}</span></button>
         <button className="like" aria-label="Share post" onClick={()=>share('/posts/'+post.id)}><Share2 size={21}/><span>Share</span></button>
-        {canteen && <button className="social-icon location-share" aria-label="Share canteen location" onClick={()=>share('/canteens/'+canteen.id)}><MapPin size={20}/></button>}
+        {canteen && <button className="social-icon location-share" aria-label="Share canteen location" onClick={()=>share(canteenMapLink(canteen))}><MapPin size={20}/></button>}
       </div>
       <div className="post-food"><b>{post.food.name}</b><span>Rs {post.food.price}</span></div>
       {post.caption && <p className="post-caption"><b>{post.author.name}</b> {post.caption}</p>}

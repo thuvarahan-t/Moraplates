@@ -31,7 +31,7 @@ export function useLikeToggle(postsRef, setPosts) {
     if (supabase && !userId) { toast('Sign in with your @uom.lk email to like plates'); return false }
 
     const liked = !p.liked
-    const apply = l => setPosts(ps => ps.map(x => (x.id === id ? { ...x, liked: l, likes: Math.max(0, x.likes + (x.liked === l ? 0 : l ? 1 : -1)) } : x)))
+    const apply = l => setPosts(ps => ps?.map(x => (x.id === id ? { ...x, liked: l, likes: Math.max(0, x.likes + (x.liked === l ? 0 : l ? 1 : -1)) } : x)) ?? ps)
     apply(liked)
     if (supabase) {
       pending.current.add(id)

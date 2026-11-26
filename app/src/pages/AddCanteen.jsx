@@ -46,10 +46,10 @@ export default function AddCanteen() {
     if (!gate('to add a canteen')) return
     setBusy(true)
     try {
-      const id = await addCanteen(session.user.id, { ...f, name: f.name.trim(), location: f.location.trim(), knownFor: f.knownFor.trim(), lat: spot.lat, lng: spot.lng, photo })
+      const {id,photoError} = await addCanteen(session.user.id, { ...f, name: f.name.trim(), location: f.location.trim(), knownFor: f.knownFor.trim(), lat: spot.lat, lng: spot.lng, photo })
       const [x, y] = centreOf(e.nativeEvent.submitter ?? e.currentTarget)
       confetti(x, y, 26)
-      toast(f.name.trim() + ' added. Now add its foods.')
+      toast(photoError?'Canteen added; please retry its photo on the canteen page.':f.name.trim() + ' added. Now add its foods.')
       navigate(`/canteens/${id}`)
     } catch (e2) {
       setErr(friendly(e2))

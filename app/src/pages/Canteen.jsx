@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Share2, Navigation, Clock } from 'lucide-react'
 import CropPhoto from '../components/CropPhoto'
-import { shareLink } from '../lib/share'
+import { shareLink, canteenMapLink } from '../lib/share'
 import { supabase } from '../lib/supabase'
 import { SAMPLE_CANTEENS, SAMPLE_FOODS } from '../data/sample'
 import { samplePosts } from '../data/feed'
@@ -36,6 +36,8 @@ export default function Canteen() {
   const gate = useSignInGate()
   const voteBtn = useRef(null)
   const [voting, setVoting] = useState(false)
+  const [localVote,setLocalVote]=useState(null)
+  useEffect(()=>{if(data)setLocalVote({id:data.myVote,votes:data.canteen.votes})},[data])
   const [photoBusy, setPhotoBusy] = useState(false)
   const [cropFile,setCropFile]=useState(null)
   const [reportBusy,setReportBusy]=useState(false)
@@ -61,7 +63,9 @@ export default function Canteen() {
 
   const { canteen: c, rank, foods, myVote, photos } = data
   const menu = [...foods].sort((a, b) => superPercent(b) - superPercent(a) || totalRatings(b) - totalRatings(a))
-  const fav = myVote === c.id
+  const currentVote=localVote?localVote.id:myVote
+  const voteCount=localVote?.votes??c.votes
+  const fav = currentVote === c.id
   const open = isOpen(c,now)
   const reported = isReportedClosed(c,now)
   const share = async()=>{if(await shareLink('/canteens/'+c.id,c.name+' · MoraPlates')==='copied')toast('Canteen link copied')}
@@ -76,6 +80,8 @@ export default function Canteen() {
   const vote = async () => {
     if (!gate('to vote') || voting) return
     setVoting(true)
+    const previous={id:currentVote,votes:voteCount}
+    setLocalVote({id:fav?null:c.id,votes:Math.max(0,voteCount+(fav?-1:1))})
     try {
       if (fav) {
         await removeVote()
@@ -89,6 +95,7 @@ export default function Canteen() {
       reload()
       if (!REDUCED_MOTION) voteBtn.current?.animate([{ transform: 'scale(.9)' }, { transform: 'scale(1.06)' }, { transform: 'scale(1)' }], { duration: 450, easing: 'ease-out' })
     } catch (e) {
+      setLocalVote(previous)
       toast(friendly(e))
     } finally {
       setVoting(false)
@@ -113,8 +120,8 @@ export default function Canteen() {
   const deletePhoto = async p => {
     if (!window.confirm('Delete this photo?')) return
     try {
-      await deleteCanteenPhoto(p)
-      toast('Photo deleted')
+      const ok=await deleteCanteenPhoto(p)
+      toast(ok?'Photo deleted':'Photo removed from gallery; storage cleanup needs attention')
       reload()
     } catch (err) {
       toast(friendly(err))
@@ -136,7 +143,7 @@ export default function Canteen() {
           <input type="file" accept="image/*" aria-label="Add canteen photo" onChange={e=>{const f=e.target.files?.[0];e.target.value='';if(f)setCropFile(f)}} disabled={photoBusy} hidden />
         </label>
         <button className="btn ghost sm" onClick={share}><Share2 size={18}/>Share</button>
-        {c.lat!=null && <a className="btn ghost sm" href={'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(c.lat+','+c.lng)} target="_blank" rel="noreferrer"><Navigation size={18}/>Directions</a>}
+        {c.lat!=null && <><a className="btn ghost sm" href={canteenMapLink(c)} target="_blank" rel="noreferrer"><Navigation size={18}/>Directions</a><button className="btn ghost sm" onClick={async()=>{if(await shareLink(canteenMapLink(c),c.name+' location')==='copied')toast('Location link copied')}}><MapIcon size={18}/>Share location</button></>}
       </div>
       <div className="closure-box"><Clock size={19}/><div><b>{reported?'Community report: closed':'Is the canteen closed now?'}</b><small>{reported?'A student reported a temporary closure. Reports expire automatically.':'Report a temporary closure for 60 minutes.'}</small></div><button className="mini" disabled={reportBusy} onClick={()=>closure(false)}>Report closed</button>{reported&&<button className="mini" disabled={reportBusy} onClick={()=>closure(true)}>Undo my report</button>}</div>
     </div>
@@ -169,7 +176,7 @@ export default function Canteen() {
 
       {cropFile && <CropPhoto file={cropFile} fixedAspect={4/3} onCancel={()=>setCropFile(null)} onDone={addPhoto}/>}
       <div className="stats rise" style={{ '--i': 1 }}>
-        <div><CountUp to={c.votes} /><span>votes this week</span></div>
+        <div><CountUp to={voteCount} /><span>votes this week</span></div>
         <div><CountUp to={canteenSuper(foods)} suffix="%" /><span>ratings say Super</span></div>
         <div><CountUp to={ratings} /><span>ratings</span></div>
         <div><CountUp to={foods.length} /><span>foods on the menu</span></div>

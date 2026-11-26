@@ -11,3 +11,5 @@ export async function shareLink(path, title) {
   window.prompt('Copy this link', url)
   return 'shown'
 }
+
+export const canteenMapLink=c=>c?.lat!=null&&c?.lng!=null?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(c.lat+','+c.lng):'/canteens/'+c?.id

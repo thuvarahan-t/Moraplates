@@ -5,6 +5,7 @@ create table public.admin_users (
 );
 alter table public.admin_users enable row level security;
 revoke all on public.admin_users from anon, authenticated;
+grant select, insert, delete on public.admin_users to service_role;
 create function public.is_admin() returns boolean
 language sql stable security definer set search_path = '' as $$
   select exists(select 1 from public.admin_users where user_id = auth.uid())

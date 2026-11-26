@@ -46,8 +46,9 @@ export default function MapView({ points = [], onOpen, value, onPick, height = 3
     if (!g) return
     g.clearLayers()
     points.forEach(p => {
+      const tooltip=document.createElement('span'); tooltip.textContent=p.label
       L.marker([p.lat, p.lng], { icon: pin(), title: p.label, keyboard: true })
-        .bindTooltip(p.label, { direction: 'top', offset: [0, -16] })
+        .bindTooltip(tooltip, { direction: 'top', offset: [0, -16] })
         .on('click', () => cb.current.onOpen?.(p.id))
         .addTo(g)
     })
@@ -66,6 +67,7 @@ export default function MapView({ points = [], onOpen, value, onPick, height = 3
     } else {
       picker.current.setLatLng([value.lat, value.lng])
     }
+    if(!m.getBounds().contains([value.lat,value.lng]))m.panTo([value.lat,value.lng])
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value?.lat, value?.lng])
 

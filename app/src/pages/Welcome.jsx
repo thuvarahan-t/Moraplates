@@ -129,7 +129,7 @@ export default function Welcome() {
         </div>
 
         <Link className="wl-alt" to="/">Continue as guest</Link>
-        <p className="wl-note" style={{ marginTop: -18 }}>Only @{ALLOWED_EMAIL_DOMAIN} accounts, so every vote is a real student.</p>
+        <p className="wl-note" style={{ marginTop: -18 }}>Join with your @{ALLOWED_EMAIL_DOMAIN} university email.</p>
 
         <div className="wl-cards">
           {POINTS.map(([Icon, bg, fg, title, sub], i) => (

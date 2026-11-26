@@ -10,4 +10,4 @@ insert into public.canteens (id, name, location, lat, lng, opens_at, closes_at, 
   ('wala-uda',       'Wala Uda Canteen',        'Wala',    null,     null,      7, 18, '#D4537E'),
   ('l-canteen',      'L Canteen',               'Campus',  null,     null,      7, 18, '#1F8A9E'),
   ('civil',          'Civil Canteen',           'Civil faculty', null, null,    7, 18, '#C9853A'),
-  ('village',        'Village Canteen',         'Campus',  null,     null,      7, 18, '#6B1E2A');
+  ('village',        'Village Canteen',         'Campus',  null,     null,      7, 18, '#6B1E2A') on conflict (id) do nothing;
