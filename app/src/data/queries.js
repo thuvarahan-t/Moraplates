@@ -98,6 +98,13 @@ export async function fetchCanteenPage(id, viewerId) {
   return { canteen: toCanteen(row), rank, foods: check(foods).map(toFood), posts, myVote: check(vote), photos }
 }
 
+/** Sets the location of a canteen that has none yet. Returns false if someone pinned it first. */
+export async function pinCanteen(id, lat, lng) {
+  need()
+  const rows = check(await supabase.from('canteens').update({ lat, lng }).eq('id', id).is('lat', null).select('id'))
+  return rows.length > 0
+}
+
 export async function castVote(canteenId) { need(); check(await supabase.rpc('cast_vote', { canteen: canteenId })) }
 export async function removeVote() { need(); check(await supabase.rpc('remove_vote')) }
 

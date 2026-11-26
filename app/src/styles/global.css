@@ -378,3 +378,8 @@ dialog#dlg[open]{animation:sheet .45s var(--spring)}
 .bnr>.dots{bottom:16px;right:16px}
 /* No footer: give the last section breathing room above the page end */
 main{padding-bottom:clamp(24px,4vw,48px)}
+/* Pin an unpinned canteen */
+.pinit{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:16px}
+.pinit .si{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:var(--ob);color:var(--ot);flex:none}
+.pinit>div{flex:1 1 160px}.pinit b{display:block}.pinit small{color:var(--mut);font-size:13px}
+.pinit-open{gap:10px}.pinit-open .err{padding:0 6px}.pinit-open .cacts{padding:0 6px 6px}

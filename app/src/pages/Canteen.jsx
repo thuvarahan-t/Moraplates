@@ -3,12 +3,12 @@ import { useParams } from 'react-router'
 import { Link } from '../components/NavLinks'
 import CountUp from '../components/CountUp'
 import Dish from '../components/Dish'
-import MapView from '../components/MapView'
+import MapView, { locate } from '../components/MapView'
 import PostCard from '../components/PostCard'
-import { BackIcon, CameraIcon, CheckIcon, HeartIcon, TrashIcon } from '../components/icons'
+import { BackIcon, CameraIcon, CheckIcon, HeartIcon, MapIcon, PinIcon, TrashIcon } from '../components/icons'
 import Slideshow, { Credit, Dots } from '../components/Slideshow'
 import { useQuery } from '../data/useQuery'
-import { addCanteenPhoto, addFood, castVote, deleteCanteenPhoto, fetchCanteenPage, friendly, removeVote } from '../data/queries'
+import { addCanteenPhoto, addFood, pinCanteen, castVote, deleteCanteenPhoto, fetchCanteenPage, friendly, removeVote } from '../data/queries'
 import { useLikeToggle } from '../data/feed'
 import { useAuth } from '../lib/auth'
 import { centreOf, useFx } from '../lib/fx'
@@ -179,10 +179,12 @@ export default function Canteen() {
         </div>
 
         <div className="side rise" style={{ '--i': 3 }}>
-          {c.lat != null && (
+          {c.lat != null ? (
             <div className="card mapcard">
               <MapView points={[{ id: c.id, lat: c.lat, lng: c.lng, label: c.name }]} height={220} />
             </div>
+          ) : (
+            <PinIt canteen={c} onPinned={reload} />
           )}
           <h3>Latest from here</h3>
           {posts.slice(0, 2).map(p => <PostCard key={p.id} post={p} canteen={c} onLike={toggleLike} />)}
@@ -199,6 +201,54 @@ export default function Canteen() {
 }
 
 const Back = () => <Link className="back" to="/canteens"><BackIcon />All canteens</Link>
+
+/** Canteens without a location: the first student who knows where it is drops the pin. */
+function PinIt({ canteen, onPinned }) {
+  const { toast } = useFx()
+  const gate = useSignInGate()
+  const [open, setOpen] = useState(false)
+  const [spot, setSpot] = useState(null)
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const save = async () => {
+    if (!spot) return setErr('Tap the map where the canteen is.')
+    setBusy(true)
+    try {
+      const ok = await pinCanteen(canteen.id, spot.lat, spot.lng)
+      toast(ok ? canteen.name + ' is on the map now' : 'Someone pinned it just before you')
+      onPinned()
+    } catch (e) {
+      setErr(friendly(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!open) {
+    return (
+      <div className="card pinit">
+        <span className="si"><MapIcon size={22} /></span>
+        <div><b>Not on the map yet</b><small>Know where {canteen.name} is? Drop the pin for everyone.</small></div>
+        <button className="btn sm ghost" onClick={() => gate('to pin canteens') && setOpen(true)}><PinIcon />Pin it</button>
+      </div>
+    )
+  }
+  return (
+    <div className="card mapcard pinit-open">
+      <MapView value={spot} onPick={p => { setSpot(p); setErr('') }} height={260} />
+      <div className="maprow">
+        <small>{spot ? 'Drag the pin to adjust, then save.' : 'Tap the map where the canteen is.'}</small>
+        <button type="button" className="mini" onClick={async () => { try { setSpot(await locate()) } catch (e) { setErr(e.message) } }}><PinIcon /> My location</button>
+      </div>
+      <p className="err" role="alert">{err}</p>
+      <div className="cacts">
+        <button className="btn sm" onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Save location'}</button>
+        <button className="btn sm ghost" onClick={() => setOpen(false)}>Cancel</button>
+      </div>
+    </div>
+  )
+}
 
 function AddFood({ canteenId, names, onAdded }) {
   const { toast } = useFx()
