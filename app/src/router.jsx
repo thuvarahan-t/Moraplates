@@ -6,7 +6,7 @@ import Canteens from './pages/Canteens'
 import Canteen from './pages/Canteen'
 import AddCanteen from './pages/AddCanteen'
 import Top from './pages/Top'
-import Profile from './pages/Profile'
+import Profile, { UserProfile } from './pages/Profile'
 
 export const router = createBrowserRouter([
   {
@@ -20,6 +20,7 @@ export const router = createBrowserRouter([
       { path: 'canteens/:id', element: <Canteen /> },
       { path: 'top', element: <Top /> },
       { path: 'profile', element: <Profile /> },
+      { path: 'u/:id', element: <UserProfile /> },
       // The feed lives on the landing page; keep old /feed links working.
       { path: 'feed', element: <Navigate to="/" replace /> },
       { path: '*', element: <Navigate to="/" replace /> },

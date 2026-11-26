@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { Link } from '../components/NavLinks'
 import CanteenThumb, { firstPhotoByCanteen } from '../components/CanteenThumb'
 import { CheckIcon, CrownIcon, HeartIcon } from '../components/icons'
-import { initialsOf, useAuth } from '../lib/auth'
-import { avatarStyle, plural } from '../lib/format'
+import { useAuth } from '../lib/auth'
+import Avatar from '../components/Avatar'
+import { plural } from '../lib/format'
 import { superPercent, totalRatings } from '../lib/food'
 import { centreOf, useFx } from '../lib/fx'
 import { useSignInGate } from '../lib/useSignInGate'
@@ -60,10 +61,10 @@ export default function Top() {
           <h3 style={{ marginBottom: 12 }}>Top foodies</h3>
           <div className="foodies">
             {data?.foodies.map((p, i) => (
-              <div key={p.user_id} className="card fd rise tilt" style={{ '--i': i }}>
-                <span className="av" style={avatarStyle(p.full_name)}>{initialsOf(p.full_name)}</span>
+              <Link key={p.user_id} className="card fd rise tilt" to={`/u/${p.user_id}`} style={{ '--i': i, textDecoration: 'none', color: 'inherit' }}>
+                <Avatar name={p.full_name} url={p.avatar} />
                 <b>{p.full_name}</b><small>{plural(p.plates, 'plate')}</small>
-              </div>
+              </Link>
             ))}
           </div>
           {data && !data.foodies.length && <p style={{ color: 'var(--mut)' }}>Post a plate to get on the board.</p>}

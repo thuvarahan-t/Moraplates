@@ -1,10 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { ALLOWED_EMAIL_DOMAIN, supabase } from './supabase'
 import { SAMPLE_ME } from '../data/sample'
+import { photoUrl } from './photos'
 
 const AuthContext = createContext(null)
 
-const toProfile = r => r && { id: r.id, fullName: r.full_name, faculty: r.faculty, batch: r.batch }
+const toProfile = r => r && { id: r.id, fullName: r.full_name, faculty: r.faculty, batch: r.batch, avatarPath: r.avatar_path, avatar: photoUrl(r.avatar_path) }
 
 export const initialsOf = name =>
   name.split(/[\s.]+/).filter(w => /^[a-z]/i.test(w)).slice(0, 2).map(w => w[0].toUpperCase()).join('') || '?'

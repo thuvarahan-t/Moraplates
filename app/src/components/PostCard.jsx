@@ -4,8 +4,8 @@ import Dish from './Dish'
 import Comments from './Comments'
 import { CommentIcon, HeartIcon } from './icons'
 import { centreOf, confetti } from '../lib/fx'
-import { initialsOf } from '../lib/auth'
-import { avatarStyle, RATING, timeAgo } from '../lib/format'
+import { RATING, timeAgo } from '../lib/format'
+import Avatar from './Avatar'
 import { supabase } from '../lib/supabase'
 
 export default function PostCard({ post, canteen, index = 0, onLike }) {
@@ -27,11 +27,13 @@ export default function PostCard({ post, canteen, index = 0, onLike }) {
     <article className="card post rise tilt" style={{ '--i': index }}>
       <div className="pb ptop">
         <div className="ph">
-          <span className="av" style={avatarStyle(post.author.name)}>{initialsOf(post.author.name)}</span>
-          <div className="who">
-            <b>{post.author.name}</b>
-            <small>{post.author.faculty ? post.author.faculty + ' · ' : ''}{timeAgo(post.createdAt)}</small>
-          </div>
+          <Link className="ph-who" to={post.userId ? `/u/${post.userId}` : '#'} aria-label={`${post.author.name}'s profile`}>
+            <Avatar name={post.author.name} url={post.author.avatar} />
+            <span className="who">
+              <b>{post.author.name}</b>
+              <small>{post.author.faculty ? post.author.faculty + ' · ' : ''}{timeAgo(post.createdAt)}</small>
+            </span>
+          </Link>
           <span className={'rt ' + cls}>{label}</span>
         </div>
       </div>
