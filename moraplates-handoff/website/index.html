@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MoraPlates</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: warm, playful canteen chatter, student-made but polished
+   IDEA: a canteen tray of plates; every tab is a plate served to the table
+   PICTURE: the MoraPlates plate in 3D, three-part food donut, fork, spoon, floating ingredients, rising steam
+   COLOUR and TYPE: cream ground, UoM maroon leads, tomato accent, mustard and leaf as food; Bricolage Grotesque (brand logo face) + DM Sans
+   LAYOUT: sticky header with sliding tab pill, hash-routed views on a 1240px column, bottom bar on phones */
+:root{color-scheme:light dark;
+--bg:light-dark(#FFF4E4,#170C0E);--card:light-dark(#FFFFFF,#24151A);--ink:light-dark(#2A1A17,#FBEFE6);--mut:light-dark(#6E5A54,#C4AEA6);
+--brand:light-dark(#6B1E2A,#F3B6A6);--btn:light-dark(#6B1E2A,#E8492F);--btnk:light-dark(#FFF4E4,#1A0B0D);
+--tom:#E8492F;--tomt:light-dark(#C23A22,#FF8A70);--mus:#F2A922;--leaf:#2F9E5B;
+--line:light-dark(#EADBC8,#3A262B);--chip:light-dark(#F4ECE2,#2E1C21);--soft:light-dark(#F7E3D0,#2E1A1E);
+--sb:light-dark(#E3F3E8,#173323);--st:light-dark(#1F6B3D,#8FE0AE);--ob:light-dark(#FDF0D2,#3A2C0F);--ot:light-dark(#7A5200,#F5C96A);--ab:light-dark(#FBE3DE,#3D1A14);--at:light-dark(#A3301B,#FF9C86);
+--sh:0 18px 40px -22px light-dark(rgba(107,30,42,.45),rgba(0,0,0,.7));--ease:cubic-bezier(.2,.8,.2,1);--spring:cubic-bezier(.3,1.4,.5,1)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+[hidden]{display:none!important}
+html{scroll-padding-top:84px}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 'DM Sans',system-ui,sans-serif;overflow-x:clip}
+h1,h2,h3,.disp{font-family:'Bricolage Grotesque','DM Sans',sans-serif;letter-spacing:-.025em;line-height:1.05;text-wrap:balance;margin:0;color:var(--brand)}
+h1{font-size:clamp(34px,4.6vw,52px);font-weight:800}h2{font-size:clamp(28px,3.4vw,40px);font-weight:800}h3{font-size:20px;font-weight:800}
+p{margin:0}a{color:var(--brand)}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--tom);outline-offset:2px;border-radius:10px}
+.ic{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.wrap{max-width:1240px;margin:0 auto}
+.band{padding:clamp(28px,4vw,64px) max(5vw,16px)}
+/* header */
+.top{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:saturate(1.4) blur(10px);border-bottom:1px solid var(--line);view-transition-name:hdr}
+.hw{max-width:1240px;margin:0 auto;display:flex;align-items:center;gap:16px;padding:10px max(5vw,16px)}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;font:800 22px/1 'Bricolage Grotesque',sans-serif;letter-spacing:-.03em;color:var(--tom)}
+.brand b{color:var(--brand)}.mk{width:34px;height:34px;transition:transform .8s var(--spring)}.brand:hover .mk{transform:rotate(200deg)}
+.tabs{position:relative;display:flex;gap:2px;margin-left:auto;background:var(--chip);border-radius:999px;padding:4px}
+.tabs a{position:relative;z-index:1;padding:9px 16px;border-radius:999px;text-decoration:none;color:var(--mut);font-weight:700;font-size:15px;transition:color .3s}
+.tabs a[aria-current]{color:var(--btnk)}
+.ind{position:absolute;top:4px;bottom:4px;left:0;width:0;border-radius:999px;background:var(--btn);transition:transform .5s var(--spring),width .5s var(--spring)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 22px;border-radius:999px;border:0;background:var(--btn);color:var(--btnk);font-weight:700;font-size:16px;text-decoration:none;cursor:pointer;transition:transform .25s var(--spring),box-shadow .3s,background .3s}
+.btn:hover{transform:translateY(-2px);box-shadow:var(--sh)}.btn:active{transform:scale(.96)}
+.btn.sm{min-height:44px;padding:0 18px;font-size:15px}.btn.ghost{background:transparent;color:var(--brand);box-shadow:inset 0 0 0 2px var(--brand)}
+.btn.voted{background:var(--sb);color:var(--st);box-shadow:inset 0 0 0 2px var(--leaf)}
+.me{display:none;width:44px;height:44px;border-radius:50%;background:var(--btn);color:var(--btnk);font-weight:800;text-decoration:none;align-items:center;justify-content:center;margin-left:auto}
+/* views */
+.view{animation:vin .55s var(--ease) both}
+@keyframes vin{from{opacity:0;transform:translateY(14px)}}
+::view-transition-old(root){animation:vout .22s ease both}::view-transition-new(root){animation:vin .5s var(--ease) both}
+@keyframes vout{to{opacity:0;transform:translateY(-8px)}}
+.rise{animation:rise .6s var(--ease) backwards;animation-delay:calc(var(--i,0)*60ms)}
+@keyframes rise{from{opacity:0;transform:translateY(26px) scale(.97)}}
+.noanim .rise{animation:none}
+.vh{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:12px 24px;margin-bottom:20px}
+.vh p{color:var(--mut);max-width:60ch}
+.card{background:var(--card);border-radius:22px;box-shadow:0 1px 0 var(--line)}
+.tilt{transform:perspective(900px) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg)) translateY(var(--ty,0));transition:transform .4s var(--ease),box-shadow .4s}
+.tilt:hover{--ty:-5px;box-shadow:var(--sh)}
+/* hero */
+.hero{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);grid-template-areas:"t s" "c s";align-items:center;column-gap:24px;min-height:min(84vh,740px);max-width:1240px;margin:0 auto;padding:24px max(5vw,16px) 8px}
+.ht{grid-area:t;align-self:end;display:flex;flex-direction:column;gap:16px}
+.hc{grid-area:c;align-self:start;display:flex;flex-direction:column;gap:22px;margin-top:22px}
+.ht p{font-size:18px;color:var(--mut);max-width:44ch}
+.kick{display:inline-flex;align-items:center;gap:8px;align-self:flex-start;background:var(--card);border-radius:999px;padding:6px 14px 6px 8px;font-weight:700;font-size:14px;color:var(--brand);box-shadow:0 1px 0 var(--line)}
+.kick i{width:10px;height:10px;border-radius:50%;background:var(--leaf);box-shadow:0 0 0 0 var(--leaf);animation:ping 2s infinite}
+@keyframes ping{70%{box-shadow:0 0 0 10px transparent}}
+.cta{display:flex;flex-wrap:wrap;gap:12px}
+.hstats{display:flex;flex-wrap:wrap;gap:28px}.hstats b{display:block;font:800 30px/1 'Bricolage Grotesque',sans-serif;color:var(--brand)}.hstats span{font-size:14px;color:var(--mut)}
+.stage{grid-area:s;position:relative;height:min(78vh,680px);min-height:420px}
+.stage::before{content:"";position:absolute;inset:12% 4% 4%;border-radius:50%;background:radial-gradient(closest-side,color-mix(in srgb,var(--mus) 34%,transparent),transparent);filter:blur(4px)}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:pan-y}
+.fallback{display:none;position:absolute;inset:18%;width:64%;height:64%;animation:spin 18s linear infinite}
+.nogl .fallback{display:block}@media(hover:none){.hint{display:none}}@keyframes spin{to{transform:rotate(360deg)}}
+.hint{position:absolute;right:8px;bottom:12px;font-size:13px;color:var(--mut);background:var(--card);padding:6px 12px;border-radius:999px;box-shadow:0 1px 0 var(--line)}
+/* marquee */
+.mq{background:var(--tom);color:#FFF4E4;overflow:hidden;padding:14px 0;transform:rotate(-1.2deg);margin:18px -10px}
+.mq div{display:flex;gap:40px;width:max-content;animation:mq 38s linear infinite;font:800 24px/1 'Bricolage Grotesque',sans-serif;white-space:nowrap}
+.mq span::after{content:"";display:inline-block;width:10px;height:10px;border-radius:50%;background:#FFF4E4;margin-left:40px;vertical-align:middle}
+.mq:hover div{animation-play-state:paused}@keyframes mq{to{transform:translateX(-50%)}}
+.duo{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:20px}
+.hot{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);overflow:hidden}
+.hot .dish{border-radius:0;aspect-ratio:auto;min-height:280px}
+.hot .hb{padding:26px;display:flex;flex-direction:column;gap:12px;justify-content:center}
+.lbl{font-size:13px;font-weight:700;color:var(--tomt)}
+.steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.step{padding:26px;display:flex;flex-direction:column;gap:10px}
+.step .si{width:56px;height:56px;border-radius:18px;display:grid;place-items:center;transition:transform .5s var(--spring)}
+.step:hover .si{transform:rotate(-12deg) scale(1.1)}
+.step p{color:var(--mut)}
+.ctab{background:var(--btn);color:var(--btnk);border-radius:28px;padding:clamp(26px,4vw,48px);display:flex;flex-wrap:wrap;gap:20px;align-items:center;justify-content:space-between;overflow:hidden;position:relative}
+.ctab h2{color:var(--btnk)}.ctab .btn{background:var(--btnk);color:var(--btn)}
+.ctab svg.big{position:absolute;right:-60px;top:-60px;width:240px;height:240px;opacity:.16;animation:spin 30s linear infinite}
+/* dish illustration */
+.dish{position:relative;aspect-ratio:4/3;background:color-mix(in srgb,var(--cc,#E8492F) 16%,var(--soft));display:grid;place-items:center;overflow:hidden}
+.dish i{width:min(62%,220px);aspect-ratio:1;border-radius:50%;transition:transform .9s var(--spring);
+background:radial-gradient(circle at 36% 38%,var(--a) 0 17%,transparent 18%),radial-gradient(circle at 63% 36%,var(--b) 0 15%,transparent 16%),radial-gradient(circle at 52% 66%,var(--c) 0 19%,transparent 20%),radial-gradient(circle at 30% 64%,var(--b) 0 7%,transparent 8%),radial-gradient(circle,#FFFDF8 0 66%,#EADBC8 67% 70%,#FFFDF8 71%);
+box-shadow:0 22px 30px -14px rgba(70,20,25,.45),inset 0 -6px 10px rgba(70,20,25,.08)}
+.card:hover .dish i,.hot:hover .dish i{transform:rotate(40deg) scale(1.05)}
+/* feed */
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;align-items:center}.chips .sp{flex:1}
+.chip{min-height:44px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--brand);font-weight:600;font-size:15px;cursor:pointer;transition:background .3s,color .3s,transform .25s var(--spring)}
+.chip:hover{transform:translateY(-2px)}.chip.on{background:var(--btn);color:var(--btnk);border-color:transparent}
+.posts{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:18px;align-items:start}
+.post{overflow:hidden}.pb{padding:16px;display:flex;flex-direction:column;gap:12px}
+.ph{display:flex;align-items:center;gap:10px}.who{flex:1;display:flex;flex-direction:column;line-height:1.25}.who small{color:var(--mut);font-size:13px}
+.av{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:14px;flex:none}
+.rt{font-size:13px;font-weight:700;padding:5px 11px;border-radius:999px;white-space:nowrap}
+.rt.sup{background:var(--sb);color:var(--st)}.rt.ok{background:var(--ob);color:var(--ot)}.rt.av2{background:var(--ab);color:var(--at)}
+.tags{display:flex;flex-wrap:wrap;gap:6px}.tag{font-size:13px;font-weight:600;padding:4px 10px;border-radius:999px;background:var(--chip);color:var(--ink);text-decoration:none;white-space:nowrap}
+.tag.tc{background:var(--ab);color:var(--at);transition:transform .25s var(--spring)}.tag.tc:hover{transform:scale(1.06)}
+.like{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 12px;margin-left:-12px;border:0;background:none;border-radius:999px;color:var(--mut);font-weight:700;cursor:pointer;transition:background .3s}
+.like:hover{background:var(--chip)}.like.on{color:var(--tomt)}.like.on svg{fill:var(--tom);stroke:var(--tom)}
+.like.pop svg{animation:pop .5s var(--spring)}@keyframes pop{40%{transform:scale(1.5) rotate(-12deg)}}
+.empty{grid-column:1/-1;text-align:center;padding:48px 20px;display:flex;flex-direction:column;align-items:center;gap:10px}.empty p{color:var(--mut)}
+/* canteens */
+.ctl{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:20px}
+.search{flex:1 1 320px;display:flex;align-items:center;gap:10px;height:52px;padding:0 16px;background:var(--card);border-radius:16px;border:1px solid var(--line);transition:border-color .3s,box-shadow .3s}
+.search:focus-within{border-color:var(--tom);box-shadow:0 0 0 4px color-mix(in srgb,var(--tom) 20%,transparent)}
+.search input{flex:1;border:0;outline:0;background:none;font-size:16px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.clist{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
+.ccard{display:flex;gap:14px;padding:18px;text-decoration:none;color:var(--ink);align-items:flex-start}
+.rank{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;font:800 20px/1 'Bricolage Grotesque',sans-serif;background:var(--chip);color:var(--brand);flex:none}
+.rank.r1{background:var(--mus);color:#4A2A00}
+.cb{flex:1;display:flex;flex-direction:column;gap:6px}.row{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.cn{font:800 19px/1.2 'Bricolage Grotesque',sans-serif}.vt{font-size:14px;color:var(--mut);white-space:nowrap}.vt b{color:var(--brand);font-size:16px}
+.cb small{color:var(--mut);font-size:14px}
+.open{font-size:13px;font-weight:700}.open.y{color:var(--st)}.open.n{color:var(--at)}
+.favb{font-size:12px;font-weight:700;background:var(--sb);color:var(--st);padding:2px 8px;border-radius:999px;margin-left:6px}
+.bar{height:8px;border-radius:99px;background:var(--chip);overflow:hidden;margin-top:4px}
+.bar i{display:block;height:100%;width:var(--w);border-radius:99px;background:var(--cc,var(--tom));animation:grow 1.1s var(--ease) backwards;animation-delay:calc(var(--i,0)*60ms + .2s)}
+@keyframes grow{from{width:0}}
+.found{grid-column:1/-1;padding:18px;display:flex;flex-direction:column;gap:6px}
+.frow{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:10px 12px;border-radius:14px;text-decoration:none;color:var(--ink);transition:background .25s}
+.frow:hover{background:var(--chip)}.frow b{flex:1 1 140px}.frow span:not(.rt){color:var(--mut);font-size:14px}
+/* canteen page */
+.back{display:inline-flex;align-items:center;gap:6px;min-height:44px;font-weight:700;text-decoration:none;margin-bottom:10px}
+.chero{display:grid;grid-template-columns:minmax(0,4fr) minmax(0,7fr);overflow:hidden;margin-bottom:16px}
+.chero .dish{aspect-ratio:auto;min-height:260px}
+.chero .dish i{animation:spin 40s linear infinite}
+.ctx{padding:clamp(20px,3vw,36px);display:flex;flex-direction:column;gap:10px;align-items:flex-start}
+.ctx p{color:var(--mut)}.pill{font-size:13px;font-weight:800;background:var(--mus);color:#4A2A00;padding:5px 12px;border-radius:999px}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.stats div{background:var(--card);border-radius:18px;padding:16px;box-shadow:0 1px 0 var(--line)}
+.stats b{display:block;font:800 30px/1 'Bricolage Grotesque',sans-serif;color:var(--brand)}.stats span{font-size:14px;color:var(--mut)}
+.two{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,4fr);gap:16px;align-items:start}
+.menu{padding:20px}.mh{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px}.mh span{color:var(--mut);font-size:14px}
+.mrow{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.mi{flex:1;display:flex;flex-direction:column;gap:2px}.mi small{color:var(--mut);font-size:13px}
+.s3{display:flex;height:6px;border-radius:99px;overflow:hidden;background:var(--chip);margin-top:6px;max-width:260px}
+.s3 i{height:100%;width:var(--w);animation:grow 1s var(--ease) backwards .3s}.s3 .s{background:var(--leaf)}.s3 .o{background:var(--mus)}.s3 .a{background:var(--tom)}
+.mini{min-height:40px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--brand);font-weight:700;font-size:14px;cursor:pointer;transition:transform .25s var(--spring),background .3s}
+.mini:hover{background:var(--chip);transform:scale(1.05)}
+.addf{margin-top:16px;padding:16px;border-radius:16px;background:var(--chip);display:flex;flex-direction:column;gap:10px}
+.afr{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+.fl{display:flex;flex-direction:column;gap:6px;font-weight:700;font-size:15px;flex:1 1 150px}
+.fl em{font-style:normal;font-weight:400;color:var(--mut);font-size:13px;margin-left:6px}
+.fl input,.fl select,.fl textarea{min-height:48px;border-radius:14px;border:1px solid var(--line);background:var(--card);padding:10px 14px;font-size:16px;font-weight:400;outline:0;transition:border-color .3s,box-shadow .3s;resize:none}
+.fl input:focus,.fl select:focus,.fl textarea:focus{border-color:var(--tom);box-shadow:0 0 0 4px color-mix(in srgb,var(--tom) 20%,transparent)}
+.err{color:var(--at);font-size:14px;font-weight:700;min-height:1em}
+.side{display:flex;flex-direction:column;gap:14px}
+/* top */
+.podium{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:end;max-width:760px;margin:30px auto 40px;perspective:900px}
+.pod{display:flex;flex-direction:column;align-items:center;gap:6px;text-decoration:none;color:var(--ink);text-align:center}
+.pn{font:800 18px/1.2 'Bricolage Grotesque',sans-serif}.pv{font-size:14px;color:var(--mut)}
+.blk{position:relative;width:100%;height:var(--h);margin-top:18px;border-radius:6px 6px 0 0;background:color-mix(in srgb,var(--cc) 82%,#000 0%);display:flex;justify-content:center;padding-top:14px;font:800 40px/1 'Bricolage Grotesque',sans-serif;color:#2A0F12;transform-origin:bottom;animation:pod 1s var(--spring) backwards;animation-delay:var(--d)}
+.blk::before{content:"";position:absolute;left:0;right:0;bottom:100%;height:18px;background:color-mix(in srgb,var(--cc) 60%,#fff);clip-path:polygon(7% 0,93% 0,100% 100%,0 100%)}
+@keyframes pod{from{transform:scaleY(0)}}
+.crown{color:var(--mus);animation:bob 2.4s ease-in-out infinite}@keyframes bob{50%{transform:translateY(-6px) rotate(-6deg)}}
+.rk{display:flex;align-items:center;gap:14px;padding:14px 18px;border-bottom:1px solid var(--line)}
+.rk .n{font:800 22px/1 'Bricolage Grotesque',sans-serif;color:var(--tomt);width:28px}
+.rk .mi{flex:1}
+.foodies{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.fd{padding:18px 12px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}.fd .av{width:56px;height:56px;font-size:18px}.fd small{color:var(--mut)}
+/* profile */
+.pro{display:flex;flex-wrap:wrap;align-items:center;gap:18px;padding:24px;margin-bottom:16px}
+.pro .av{width:84px;height:84px;font-size:28px;background:var(--btn);color:var(--btnk)}
+.pro .who b{font:800 28px/1.1 'Bricolage Grotesque',sans-serif}
+.badges{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+.bdg{padding:16px;display:flex;gap:12px;align-items:center}.bdg .si{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;flex:none}
+.bdg small{display:block;color:var(--mut);font-size:13px}.bdg.lock{opacity:.6}
+.mine{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+.mine .card{overflow:hidden}.mine .dish{aspect-ratio:1}.mine .mb{padding:10px 12px;display:flex;justify-content:space-between;gap:6px;align-items:center;font-size:14px;font-weight:700}
+.sec{margin-top:32px;margin-bottom:14px}
+/* dialog */
+dialog{border:0;border-radius:26px;padding:0;width:min(560px,calc(100vw - 24px));max-height:calc(100vh - 24px);background:var(--bg);color:var(--ink);box-shadow:0 40px 80px -30px rgba(0,0,0,.6)}
+dialog[open]{animation:din .45s var(--spring)}@keyframes din{from{opacity:0;transform:translateY(30px) scale(.94)}}
+dialog::backdrop{background:rgba(30,10,14,.55);animation:fade .3s ease}@keyframes fade{from{opacity:0}}
+#pf{padding:22px;display:flex;flex-direction:column;gap:16px}
+.dh{display:flex;justify-content:space-between;align-items:center}.dh h2{font-size:28px}
+.x{width:44px;height:44px;border-radius:50%;border:0;background:var(--card);color:var(--brand);display:grid;place-items:center;cursor:pointer;transition:transform .3s var(--spring)}.x:hover{transform:rotate(90deg)}
+fieldset{border:0;padding:0;margin:0;display:flex;flex-direction:column;gap:8px}legend{font-weight:700;font-size:15px;padding:0;margin-bottom:8px}
+.seg{display:flex;flex-wrap:wrap;gap:8px}
+.seg label{position:relative}.seg input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.seg span{display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--brand);font-weight:600;font-size:15px;transition:all .3s var(--spring)}
+.seg input:checked+span{background:var(--btn);color:var(--btnk);border-color:transparent;transform:scale(1.04)}
+.seg input:focus-visible+span{outline:3px solid var(--tom);outline-offset:2px}
+.rate{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.rate span{flex-direction:column;justify-content:center;width:100%;min-height:72px;border-radius:18px;font:800 18px/1.1 'Bricolage Grotesque',sans-serif}.rate small{font:500 12px/1.2 'DM Sans',sans-serif;margin-top:4px}
+.rate .s input:checked+span{background:var(--sb);color:var(--st);box-shadow:inset 0 0 0 2px var(--leaf)}
+.rate .o input:checked+span{background:var(--ob);color:var(--ot);box-shadow:inset 0 0 0 2px var(--mus)}
+.rate .a input:checked+span{background:var(--ab);color:var(--at);box-shadow:inset 0 0 0 2px var(--tom)}
+.newf{display:flex;flex-wrap:wrap;gap:10px;animation:rise .4s var(--ease)}
+.wide{width:100%;min-height:56px;font-size:17px}
+/* toast, confetti, footer, mobile nav */
+#toast{position:fixed;left:50%;bottom:24px;z-index:50;transform:translate(-50%,240%);opacity:0;background:var(--ink);color:var(--bg);padding:12px 20px;border-radius:999px;font-weight:700;transition:transform .5s var(--spring);display:flex;gap:8px;align-items:center;max-width:calc(100vw - 32px)}
+#toast.on{transform:translate(-50%,0);opacity:1}#toast{transition:transform .5s var(--spring),opacity .3s}
+.cf{position:fixed;width:8px;height:12px;border-radius:2px;pointer-events:none;z-index:99;animation:cf .9s cubic-bezier(.2,.7,.3,1) forwards}
+@keyframes cf{to{transform:translate(var(--dx),var(--dy)) rotate(var(--r));opacity:0}}
+footer{border-top:1px solid var(--line);margin-top:24px}
+.fw{display:flex;flex-wrap:wrap;gap:12px 28px;justify-content:space-between;align-items:center;color:var(--mut);font-size:14px}
+.bnav{display:none}
+@media(max-width:900px){.hero{grid-template-columns:minmax(0,1fr);grid-template-areas:"t" "s" "c";min-height:0}.stage{height:360px;min-height:0}.hc{margin-top:0}
+.duo,.two,.hot,.chero{grid-template-columns:minmax(0,1fr)}.steps{grid-template-columns:minmax(0,1fr)}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){.tabs,.hw>.btn{display:none}.me{display:flex}
+body{padding-bottom:86px}#toast{bottom:100px}
+.bnav{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:30;height:76px;background:var(--card);border-top:1px solid var(--line);justify-content:space-around;align-items:center;padding:0 6px 8px;view-transition-name:bnav}
+.bnav a{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:56px;min-height:48px;justify-content:center;font-size:12px;font-weight:600;color:var(--mut);text-decoration:none;transition:color .3s,transform .3s var(--spring)}
+.bnav a[aria-current]{color:var(--brand);transform:translateY(-3px)}
+.bnav .plus{width:58px;height:58px;border-radius:50%;border:0;background:var(--btn);color:var(--btnk);display:grid;place-items:center;margin-top:-26px;box-shadow:var(--sh);cursor:pointer;transition:transform .3s var(--spring)}
+.bnav .plus:active{transform:scale(.9) rotate(90deg)}
+.clist{grid-template-columns:minmax(0,1fr)}.chips .sp{display:none}.podium{gap:8px}.pn{font-size:15px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="mark" viewBox="0 0 200 200">
+    <circle cx="100" cy="100" r="88" fill="#FFFFFF" stroke="#6B1E2A" stroke-width="8"/>
+    <circle cx="100" cy="100" r="70" fill="none" stroke="#6B1E2A" stroke-opacity=".3" stroke-width="2.5"/>
+    <circle cx="100" cy="100" r="30" fill="none" stroke="#E8492F" stroke-width="60" stroke-dasharray="80.8 200" transform="rotate(-90 100 100)"/>
+    <circle cx="100" cy="100" r="30" fill="none" stroke="#F2A922" stroke-width="60" stroke-dasharray="58.2 200" transform="rotate(72 100 100)"/>
+    <circle cx="100" cy="100" r="30" fill="none" stroke="#2F9E5B" stroke-width="60" stroke-dasharray="37.5 200" transform="rotate(190.8 100 100)"/>
+    <circle cx="100" cy="100" r="17" fill="#FFFFFF"/><circle cx="100" cy="100" r="7" fill="#6B1E2A"/>
+  </symbol>
+</svg>
+
+<header class="top">
+  <div class="hw">
+    <a class="brand" href="#home" aria-label="MoraPlates home"><svg class="mk" aria-hidden="true"><use href="#mark"/></svg><span><b>Mora</b>Plates</span></a>
+    <nav class="tabs" aria-label="Main"><span class="ind" aria-hidden="true"></span>
+      <a href="#home" data-t="home">Home</a><a href="#feed" data-t="feed">Feed</a><a href="#canteens" data-t="canteens">Canteens</a><a href="#top" data-t="top">Top</a><a href="#profile" data-t="profile">Profile</a>
+    </nav>
+    <button class="btn sm" data-open-post><svg class="ic" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Post your plate</button>
+    <a class="me" href="#profile" aria-label="Your profile">SP</a>
+  </div>
+</header>
+
+<main>
+  <section class="view" id="v-home" hidden>
+    <div class="hero">
+      <div class="ht">
+        <span class="kick"><i></i><span id="liveN">38</span> plates posted today</span>
+        <h1>Every Mora canteen, rated by the students who eat there.</h1>
+        <p>See what's good right now, post what's on your plate, and vote for the canteen that feeds you best.</p>
+      </div>
+      <div class="stage" id="stage">
+        <svg class="fallback" aria-hidden="true"><use href="#mark"/></svg>
+        <span class="hint">Move your cursor to turn the plate</span>
+      </div>
+      <div class="hc">
+        <div class="cta"><button class="btn" data-open-post>Post your plate</button><a class="btn ghost" href="#canteens">Explore canteens</a></div>
+        <div class="hstats">
+          <div><b data-count="1013" id="hsV">1,013</b><span>votes this week</span></div>
+          <div><b data-count="5">5</b><span>canteens</span></div>
+          <div><b data-count="16" id="hsF">16</b><span>foods rated</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="mq" aria-hidden="true"><div id="mq"></div></div>
+    <div class="band"><div class="wrap">
+      <div class="duo">
+        <div id="hot"></div>
+        <div class="card" style="padding:20px">
+          <div class="mh"><h3>This week's top 3</h3><a href="#top" style="font-weight:700">See all</a></div>
+          <div id="homeTop"></div>
+        </div>
+      </div>
+    </div></div>
+    <div class="band" style="padding-top:0"><div class="wrap">
+      <div class="vh"><h2>Three taps to a better lunch</h2></div>
+      <div class="steps">
+        <div class="card step tilt"><span class="si" style="background:var(--ab);color:var(--at)"><svg class="ic" width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h1a2 2 0 0 0 2-2a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1a2 2 0 0 0 2 2h1a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2"/><circle cx="12" cy="13" r="3"/></svg></span><h3>Post your plate</h3><p>Pick the canteen, pick the food, say Super, Okay or Avoid. Photo optional.</p></div>
+        <div class="card step tilt"><span class="si" style="background:var(--ob);color:var(--ot)"><svg class="ic" width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="M21 21l-6-6"/></svg></span><h3>Find the good stuff</h3><p>Search a food and see which canteen makes it best, with real ratings and prices.</p></div>
+        <div class="card step tilt"><span class="si" style="background:var(--sb);color:var(--st)"><svg class="ic" width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4"/></svg></span><h3>Vote your favourite</h3><p>One vote per student, changeable anytime. The weekly podium resets every Monday.</p></div>
+      </div>
+    </div></div>
+    <div class="band" style="padding-top:0"><div class="wrap">
+      <div class="ctab"><svg class="big" aria-hidden="true"><use href="#mark"/></svg><h2>Ate something today?</h2><button class="btn" data-open-post>Post your plate</button></div>
+    </div></div>
+  </section>
+
+  <section class="view" id="v-feed" hidden><div class="band"><div class="wrap">
+    <div class="vh"><div><h2>On the tray today</h2><p>What Mora students are eating right now.</p></div></div>
+    <div class="chips" id="feedChips"></div>
+    <div class="posts" id="feedList"></div>
+  </div></div></section>
+
+  <section class="view" id="v-canteens" hidden><div class="band"><div class="wrap">
+    <div class="vh"><div><h2>Canteens</h2><p>Ranked by student votes this week. Search a food to see where it's made best.</p></div></div>
+    <div class="ctl">
+      <label class="search"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="M21 21l-6-6"/></svg><span class="sr">Search a food or canteen</span><input id="cq" type="search" placeholder="Where can I get kottu?" autocomplete="off"></label>
+      <div class="chips" id="cSort" style="margin:0"></div>
+    </div>
+    <div class="clist" id="cList"></div>
+  </div></div></section>
+
+  <section class="view" id="v-canteen" hidden><div class="band"><div class="wrap" id="cDetail"></div></div></section>
+
+  <section class="view" id="v-top" hidden><div class="band"><div class="wrap">
+    <div class="vh"><div><h2>Top this week</h2><p>Votes and ratings reset every Monday at 8am.</p></div></div>
+    <div class="podium" id="podium"></div>
+    <div class="two">
+      <div class="card" style="overflow:hidden"><div style="padding:18px 18px 4px"><h3>Top dishes</h3></div><div id="topDish"></div></div>
+      <div><h3 style="margin-bottom:12px">Top foodies</h3><div class="foodies" id="foodies"></div></div>
+    </div>
+  </div></div></section>
+
+  <section class="view" id="v-profile" hidden><div class="band"><div class="wrap" id="prof"></div></div></section>
+</main>
+
+<footer class="band"><div class="wrap fw">
+  <a class="brand" href="#home"><svg class="mk" aria-hidden="true"><use href="#mark"/></svg><span><b>Mora</b>Plates</span></a>
+  <span>Sample canteens, prices and posts for this prototype. A student project, not an official University of Moratuwa service.</span>
+</div></footer>
+
+<nav class="bnav" aria-label="Main">
+  <a href="#home" data-t="home"><svg class="ic" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12H3l9-9l9 9h-2"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>Home</a>
+  <a href="#feed" data-t="feed"><svg class="ic" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg>Feed</a>
+  <button class="plus" data-open-post aria-label="Post your plate"><svg class="ic" width="26" height="26" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width:2.6"><path d="M12 5v14M5 12h14"/></svg></button>
+  <a href="#canteens" data-t="canteens"><svg class="ic" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21h18M5 21V10M19 21V10"/><path d="M3 7l2-4h14l2 4a3 3 0 0 1-6 0a3 3 0 0 1-6 0a3 3 0 0 1-6 0"/></svg>Canteens</a>
+  <a href="#top" data-t="top"><svg class="ic" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4"/></svg>Top</a>
+</nav>
+
+<dialog id="dlg" aria-labelledby="dlgT">
+  <form id="pf" novalidate>
+    <div class="dh"><h2 id="dlgT">Post your plate</h2><button type="button" class="x" data-close aria-label="Close"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+    <fieldset><legend>Where did you eat?</legend><div class="seg" id="pfC"></div></fieldset>
+    <label class="fl"><span>What did you eat?</span><select id="pfF"></select></label>
+    <div class="newf" id="pfNew" hidden>
+      <label class="fl"><span>Food name</span><input id="pfN" maxlength="40" placeholder="Cheese kottu"></label>
+      <label class="fl"><span>Price (Rs)</span><input id="pfP" type="number" min="1" max="5000" inputmode="numeric" placeholder="450"></label>
+    </div>
+    <fieldset><legend>How was it?</legend><div class="seg rate">
+      <label class="s"><input type="radio" name="pr" value="s" checked><span>Super<small>Would eat again</small></span></label>
+      <label class="o"><input type="radio" name="pr" value="o"><span>Okay<small>It's fine</small></span></label>
+      <label class="a"><input type="radio" name="pr" value="a"><span>Avoid<small>Skip it</small></span></label>
+    </div></fieldset>
+    <label class="fl"><span>Say something <em id="cnt">0/160</em></span><textarea id="pfT" maxlength="160" rows="3" placeholder="Spicy? Cold? Worth the queue?"></textarea></label>
+    <p class="err" id="pfErr" role="alert"></p>
+    <button class="btn wide" type="submit">Post to feed</button>
+  </form>
+</dialog>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+{
+const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const HEART='<svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 12.6L12 20l-7.5-7.4a5 5 0 1 1 7.5-6.6a5 5 0 1 1 7.5 6.6"/></svg>';
+const CHECK='<svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width:2.6"><path d="M5 12l5 5L20 7"/></svg>';
+const BACK='<svg class="ic" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6l6 6"/></svg>';
+
+const C=[
+ {id:'it',name:'IT canteen',near:'Near the IT faculty',open:7,close:19,known:'Chicken kottu',votes:312,col:'#E8492F'},
+ {id:'main',name:'Main canteen',near:'Beside the library',open:7,close:16,known:'Rice and curry',votes:268,col:'#E09A12'},
+ {id:'civil',name:'Civil canteen',near:'Civil faculty block',open:7,close:17,known:'String hoppers',votes:190,col:'#2F9E5B'},
+ {id:'juice',name:'Juice bar',near:'Near the ground',open:9,close:18,known:'Faluda',votes:145,col:'#D4537E'},
+ {id:'hostel',name:'Hostel canteen',near:'Inside the hostel premises',open:6,close:22,known:'Egg roti',votes:98,col:'#7F77DD'}];
+const F=[['kottu','it','Chicken kottu',450,114,8,2],['ckottu','it','Cheese kottu',550,53,6,2],['efr','it','Egg fried rice',380,15,30,2],['fbun','it','Fish bun',80,5,6,11],
+ ['rc','main','Rice and curry',220,70,40,10],['vrc','main','Veg rice and curry',180,40,22,6],['par','main','Parata with dhal',150,30,12,3],
+ ['sh','civil','String hoppers',200,55,8,2],['pit','civil','Pittu with curry',190,20,14,5],['wade','civil','Wade',50,25,10,4],
+ ['fal','juice','Faluda',250,72,6,2],['wood','juice','Wood apple juice',180,30,10,3],['lime','juice','Lime juice',120,18,12,6],
+ ['eroti','hostel','Egg roti',120,40,10,4],['nood','hostel','Noodles',300,14,16,9],['tea','hostel','Plain tea',40,22,20,5]
+].map(([id,c,name,price,s,o,a])=>({id,c,name,price,s,o,a}));
+let posts=[
+ {id:1,u:'Kavin S',ini:'KS',fac:'IT',c:'it',f:'kottu',r:'s',t:'Spice level perfect, portion huge. Worth every rupee after a 4-hour lab.',likes:24,m:12},
+ {id:2,u:'Nila R',ini:'NR',fac:'Civil',c:'main',f:'rc',r:'o',t:'Dhal was great, chicken curry a bit cold by 1pm. Go early.',likes:9,m:40},
+ {id:3,u:'Amal M',ini:'AM',fac:'Mechanical',c:'juice',f:'fal',r:'s',t:'Faluda after a lab hits different. Not too sweet today.',likes:31,m:65},
+ {id:4,u:'Dinu W',ini:'DW',fac:'Electrical',c:'civil',f:'sh',r:'s',t:'String hoppers with kiri hodi, still hot at 7.30am.',likes:17,m:95},
+ {id:5,u:'Sahan P',ini:'SP',fac:'IT',c:'it',f:'fbun',r:'a',t:'Fish bun was mostly bun today. Skip it.',likes:6,m:130,mine:1},
+ {id:6,u:'Riya K',ini:'RK',fac:'Architecture',c:'hostel',f:'eroti',r:'s',t:'Egg roti with lunu miris at 9pm saved my assignment night.',likes:22,m:180},
+ {id:7,u:'Sahan P',ini:'SP',fac:'IT',c:'it',f:'ckottu',r:'s',t:'Cheese kottu, extra cheese, zero regrets.',likes:14,m:1500,mine:1}];
+const S={fav:null,filter:'all',sort:'new',q:'',cs:'votes',me:{name:'Sahan P',ini:'SP',fac:'IT faculty · Batch 22'}};
+const BASE={'Kavin S':21,'Nila R':17,'Amal M':15,'Dinu W':12,'Riya K':10,'Sahan P':19};
+
+const cOf=id=>C.find(c=>c.id===id),fOf=id=>F.find(f=>f.id===id);
+const tot=f=>f.s+f.o+f.a,pc=(f,k)=>tot(f)?Math.round(f[k]/tot(f)*100):0,sup=f=>pc(f,'s');
+const cSup=c=>{const fs=F.filter(f=>f.c===c.id),t=fs.reduce((n,f)=>n+tot(f),0);return t?Math.round(fs.reduce((n,f)=>n+f.s,0)/t*100):0};
+const ranked=()=>[...C].sort((a,b)=>b.votes-a.votes),rankOf=id=>ranked().findIndex(c=>c.id===id)+1;
+const isOpen=c=>{const h=new Date().getHours();return h>=c.open&&h<c.close};
+const hr=h=>h===12?'12pm':h>12?(h-12)+'pm':h+'am';
+const ago=m=>m<1?'just now':m<60?m+' min ago':m<1440?Math.floor(m/60)+' h ago':Math.floor(m/1440)+' d ago';
+const RT={s:['Super','sup'],o:['Okay','ok'],a:['Avoid','av2']};
+const rtOf=f=>{const s=sup(f);return s>=70?['sup',s+'% Super']:s>=50?['ok',s+'% Super']:['av2',s+'% Super']};
+const AV=[['var(--ob)','var(--ot)'],['var(--sb)','var(--st)'],['var(--ab)','var(--at)'],['light-dark(#EEEDFE,#2A2650)','light-dark(#3C3489,#C9C4FF)']];
+const avc=n=>{let h=0;for(const ch of n)h=(h*31+ch.charCodeAt(0))%997;const [b,t]=AV[h%4];return `background:${b};color:${t}`};
+const pal=n=>/kottu/i.test(n)?['#B5652B','#E9B44C','#4E8F3A']:/rice/i.test(n)?['#F3E4C8','#F2A922','#C23A22']:/hopper|pittu|roti|parata|bun|wade/i.test(n)?['#E8C9A0','#C9853A','#E8492F']:/faluda|juice|tea/i.test(n)?['#F4A7C0','#E7C27A','#D4537E']:/noodle/i.test(n)?['#E9B44C','#C23A22','#4E8F3A']:['#E8492F','#F2A922','#2F9E5B'];
+const dish=f=>{const [a,b,c]=pal(f.name);return `<div class="dish" style="--a:${a};--b:${b};--c:${c};--cc:${cOf(f.c).col}" role="img" aria-label="${esc(f.name)} illustration"><i></i></div>`};
+const empty=(h,p)=>`<div class="card empty rise"><h3>${h}</h3><p>${p}</p><button class="btn sm" data-open-post>Post your plate</button></div>`;
+
+const postCard=(p,i)=>{const f=fOf(p.f),c=cOf(p.c),[rl,rc]=RT[p.r];return `<article class="card post rise tilt" style="--i:${i}">${dish(f)}
+<div class="pb"><div class="ph"><span class="av" style="${avc(p.u)}">${esc(p.ini)}</span><div class="who"><b>${esc(p.u)}</b><small>${esc(p.fac)} · ${ago(p.m)}</small></div><span class="rt ${rc}">${rl}</span></div>
+<div class="tags"><a class="tag tc" href="#canteen-${c.id}">${esc(c.name)}</a><span class="tag">${esc(f.name)}</span><span class="tag">Rs ${f.price}</span></div>
+<p>${esc(p.t)}</p><div><button class="like${p.liked?' on':''}" data-like="${p.id}" aria-pressed="${!!p.liked}" aria-label="Like this plate">${HEART}<span>${p.likes}</span></button></div></div></article>`};
+
+function counts(root){$$('[data-count]',root).forEach(el=>{const to=+el.dataset.count,suf=el.dataset.suf||'';if(RM){el.textContent=to.toLocaleString()+suf;return}
+ const t0=performance.now(),d=1000;const step=n=>{const k=Math.min(1,(n-t0)/d),e=1-Math.pow(1-k,3);el.textContent=Math.round(to*e).toLocaleString()+suf;if(k<1)requestAnimationFrame(step)};requestAnimationFrame(step)})}
+
+function renderHome(){
+ const hot=[...F].sort((a,b)=>tot(b)-tot(a))[0],hc=cOf(hot.c);
+ $('#hot').innerHTML=`<a class="card hot tilt" href="#canteen-${hc.id}" style="text-decoration:none;color:inherit">${dish(hot)}<div class="hb"><span class="lbl">Today's hot plate</span><h2>${esc(hot.name)}</h2><p style="color:var(--mut)">${esc(hc.name)} · Rs ${hot.price}</p><div class="tags"><span class="rt sup">${sup(hot)}% say Super</span><span class="tag">${tot(hot)} ratings</span></div><span class="btn sm" style="align-self:flex-start;margin-top:6px">See the canteen</span></div></a>`;
+ $('#homeTop').innerHTML=ranked().slice(0,3).map((c,i)=>`<a class="frow" href="#canteen-${c.id}" style="--cc:${c.col}"><span class="rank${i?'':' r1'}">${i+1}</span><b>${esc(c.name)}<br><small style="font-weight:400;color:var(--mut)">Known for ${esc(c.known.toLowerCase())}</small></b><span class="vt"><b>${c.votes}</b> votes</span></a>`).join('');
+ $('#liveN').textContent=38+posts.filter(p=>p.new).length;
+ $('#hsV').dataset.count=C.reduce((n,c)=>n+c.votes,0);$('#hsF').dataset.count=F.length;
+ $('#mq').innerHTML=[...F,...F].map(f=>`<span>${esc(f.name)}</span>`).join('');
+ counts($('#v-home'));
+}
+function renderFeed(){
+ $('#feedChips').innerHTML=[['all','All canteens'],...C.map(c=>[c.id,c.name])].map(([id,n])=>`<button class="chip${S.filter===id?' on':''}" data-filter="${id}" aria-pressed="${S.filter===id}">${esc(n)}</button>`).join('')+'<span class="sp"></span>'+[['new','Latest'],['hot','Most liked']].map(([id,n])=>`<button class="chip${S.sort===id?' on':''}" data-sort="${id}" aria-pressed="${S.sort===id}">${n}</button>`).join('');
+ const list=posts.filter(p=>S.filter==='all'||p.c===S.filter).sort(S.sort==='hot'?(a,b)=>b.likes-a.likes:(a,b)=>a.m-b.m);
+ $('#feedList').innerHTML=list.length?list.map(postCard).join(''):empty('No plates here yet','Be the first to post what you ate at this canteen today.');
+}
+function renderCanteens(quiet){
+ $('#cSort').innerHTML=[['votes','Top voted'],['open','Open now'],['cheap','Cheapest']].map(([id,n])=>`<button class="chip${S.cs===id?' on':''}" data-cs="${id}" aria-pressed="${S.cs===id}">${n}</button>`).join('');
+ const q=S.q.trim().toLowerCase(),max=Math.max(...C.map(c=>c.votes)),minP=c=>Math.min(...F.filter(f=>f.c===c.id).map(f=>f.price));
+ let list=[...C];if(S.cs==='open')list=list.filter(isOpen);
+ list.sort(S.cs==='cheap'?(a,b)=>minP(a)-minP(b):(a,b)=>b.votes-a.votes);
+ let html='';
+ if(q){const fm=F.filter(f=>f.name.toLowerCase().includes(q));list=list.filter(c=>c.name.toLowerCase().includes(q)||fm.some(f=>f.c===c.id));
+  if(fm.length)html+=`<div class="card found rise"><h3>Where to get "${esc(S.q.trim())}"</h3>${fm.sort((a,b)=>sup(b)-sup(a)).map(f=>{const [k,l]=rtOf(f);return `<a class="frow" href="#canteen-${f.c}"><b>${esc(f.name)}</b><span>${esc(cOf(f.c).name)} · Rs ${f.price}</span><span class="rt ${k}">${l}</span></a>`}).join('')}</div>`}
+ html+=list.map((c,i)=>{const r=rankOf(c.id),o=isOpen(c);return `<a class="card ccard rise tilt" href="#canteen-${c.id}" style="--i:${i};--cc:${c.col}"><span class="rank${r===1?' r1':''}">${r}</span><div class="cb"><div class="row"><span class="cn">${esc(c.name)}</span><span class="vt"><b>${c.votes}</b> votes</span></div><small>Known for ${esc(c.known.toLowerCase())} · ${esc(c.near)}</small><div><span class="open ${o?'y':'n'}">${o?'Open now':'Closed'} · ${hr(c.open)} to ${hr(c.close)}</span>${S.fav===c.id?'<span class="favb">Your vote</span>':''}</div><div class="bar"><i style="--w:${Math.round(c.votes/max*100)}%"></i></div></div></a>`}).join('');
+ if(!html)html=`<div class="card empty"><h3>Nothing matches "${esc(S.q.trim())}"</h3><p>Try another food, or add it from a canteen's page.</p></div>`;
+ const box=$('#cList');box.classList.toggle('noanim',!!quiet);box.innerHTML=html;
+}
+function renderCanteen(id,quiet){
+ const c=cOf(id)||C[0],fs=F.filter(f=>f.c===c.id).sort((a,b)=>sup(b)-sup(a)),ps=posts.filter(p=>p.c===c.id).sort((a,b)=>a.m-b.m),fav=S.fav===c.id,o=isOpen(c),k=fOf(fs[0].id);
+ const box=$('#cDetail');box.classList.toggle('noanim',!!quiet);
+ box.innerHTML=`<a class="back" href="#canteens">${BACK}All canteens</a>
+ <div class="card chero rise" style="--cc:${c.col}">${dish(k)}<div class="ctx"><span class="pill">#${rankOf(c.id)} this week</span><h2>${esc(c.name)}</h2>
+ <p>${esc(c.near)} · <span class="open ${o?'y':'n'}">${o?'Open now':'Closed'}, ${hr(c.open)} to ${hr(c.close)}</span></p><p>Known for ${esc(c.known.toLowerCase())}</p>
+ <button class="btn${fav?' voted':''}" data-vote="${c.id}" aria-pressed="${fav}">${fav?CHECK+'Your favourite canteen':HEART+'Vote as my favourite'}</button></div></div>
+ <div class="stats rise" style="--i:1"><div><b data-count="${c.votes}">${c.votes}</b><span>votes this week</span></div><div><b data-count="${cSup(c)}" data-suf="%">${cSup(c)}%</b><span>ratings say Super</span></div><div><b data-count="${fs.reduce((n,f)=>n+tot(f),0)}">0</b><span>ratings</span></div><div><b data-count="${fs.length}">${fs.length}</b><span>foods on the menu</span></div></div>
+ <div class="two"><div class="card menu rise" style="--i:2"><div class="mh"><h3>Menu</h3><span>Sorted by how many say Super</span></div>
+ ${fs.map(f=>{const [kk,l]=rtOf(f);return `<div class="mrow"><div class="mi"><b>${esc(f.name)}</b><small>Rs ${f.price} · ${tot(f)} ratings</small><div class="s3" aria-hidden="true"><i class="s" style="--w:${pc(f,'s')}%"></i><i class="o" style="--w:${pc(f,'o')}%"></i><i class="a" style="--w:${pc(f,'a')}%"></i></div></div><span class="rt ${kk}">${l}</span><button class="mini" data-open-post data-c="${c.id}" data-f="${f.id}" aria-label="Post a plate of ${esc(f.name)}">Post</button></div>`}).join('')}
+ <form class="addf" id="addFood" novalidate><b>Missing something on the menu?</b><div class="afr"><label class="fl"><span>Food name</span><input name="n" maxlength="40" placeholder="Cheese kottu"></label><label class="fl" style="flex:0 1 130px"><span>Price (Rs)</span><input name="p" type="number" min="1" max="5000" inputmode="numeric" placeholder="450"></label><button class="btn sm">Add food</button></div><p class="err" id="afErr" role="alert"></p></form></div>
+ <div class="side rise" style="--i:3"><h3>Latest from here</h3>${ps.length?ps.slice(0,2).map(postCard).join(''):empty('No plates yet','Post the first plate from '+esc(c.name)+'.')}</div></div>`;
+ if(!quiet)counts(box);
+}
+function renderTop(){
+ const r=ranked(),ord=[[r[1],2,150,'.25s'],[r[0],1,210,'0s'],[r[2],3,110,'.4s']];
+ $('#podium').innerHTML=ord.map(([c,n,h,d])=>`<a class="pod" href="#canteen-${c.id}" style="--cc:${c.col};--h:${h}px;--d:${d}">${n===1?'<svg class="ic crown" width="34" height="34" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6l4 6l5-4l-2 10H5L3 8l5 4z"/></svg>':''}<span class="pn">${esc(c.name)}</span><span class="pv">${c.votes} votes</span><div class="blk">${n}</div></a>`).join('');
+ $('#topDish').innerHTML=F.filter(f=>tot(f)>=10).sort((a,b)=>sup(b)-sup(a)).slice(0,5).map((f,i)=>`<a class="rk rise" href="#canteen-${f.c}" style="--i:${i};text-decoration:none;color:inherit"><span class="n">${i+1}</span><div class="mi"><b>${esc(f.name)}</b><small>${esc(cOf(f.c).name)} · Rs ${f.price}</small><div class="bar" style="max-width:260px"><i style="--w:${sup(f)}%;--cc:var(--leaf)"></i></div></div><span class="rt sup">${sup(f)}% Super</span></a>`).join('');
+ const mineN=posts.filter(p=>p.mine&&p.new).length;
+ $('#foodies').innerHTML=Object.entries(BASE).map(([n,v])=>[n,v+(n===S.me.name?mineN:0)]).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([n,v],i)=>`<div class="card fd rise tilt" style="--i:${i}"><span class="av" style="${avc(n)}">${esc(n.split(' ').map(w=>w[0]).join(''))}</span><b>${esc(n)}</b><small>${v} plates</small></div>`).join('');
+}
+function renderProfile(){
+ const my=posts.filter(p=>p.mine).sort((a,b)=>a.m-b.m),plates=BASE[S.me.name]+posts.filter(p=>p.mine&&p.new).length,likes=128+my.reduce((n,p)=>n+p.likes,0),tried=new Set([...my.map(p=>p.c),'main','civil']).size,fc=S.fav&&cOf(S.fav);
+ const B=[['First plate','Posted your first plate',1,'var(--sb)','var(--st)'],['Kottu king','10 kottu plates posted',1,'var(--ob)','var(--ot)'],['Canteen explorer',`Tried ${tried} of 5 canteens`,tried>=5,'var(--ab)','var(--at)'],['Night owl','Post after 9pm',0,'var(--chip)','var(--mut)']];
+ $('#prof').innerHTML=`<div class="card pro rise"><span class="av">${S.me.ini}</span><div class="who"><b>${esc(S.me.name)}</b><span style="color:var(--mut)">${esc(S.me.fac)}</span></div><button class="btn sm" data-open-post style="margin-left:auto">Post your plate</button></div>
+ <div class="stats rise" style="--i:1"><div><b data-count="${plates}">${plates}</b><span>plates posted</span></div><div><b data-count="${tried}" data-suf=" of 5">${tried} of 5</b><span>canteens tried</span></div><div><b data-count="${likes}">${likes}</b><span>likes received</span></div><div><b data-count="${my.filter(p=>p.r==='s').length}">0</b><span>Super ratings given</span></div></div>
+ ${fc?`<a class="card ccard rise tilt" href="#canteen-${fc.id}" style="--i:2;box-shadow:inset 0 0 0 2px var(--leaf)"><span class="rank" style="background:var(--sb);color:var(--st)">${HEART}</span><div class="cb"><small>Your favourite canteen</small><span class="cn">${esc(fc.name)}</span></div><span style="font-weight:700;align-self:center">Change</span></a>`:`<a class="card ccard rise tilt" href="#canteens" style="--i:2"><span class="rank">${HEART}</span><div class="cb"><span class="cn">Pick your favourite canteen</span><small>You haven't voted this week. Open a canteen and tap Vote.</small></div></a>`}
+ <h3 class="sec">Badges</h3><div class="badges">${B.map(([n,d,on,bg,fg],i)=>`<div class="card bdg rise${on?'':' lock'}" style="--i:${i}"><span class="si" style="background:${bg};color:${fg}">${on?CHECK:'<svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>'}</span><div><b>${n}</b><small>${d}</small></div></div>`).join('')}</div>
+ <h3 class="sec">Your plates</h3><div class="mine">${my.map((p,i)=>{const f=fOf(p.f),[rl,rc]=RT[p.r];return `<a class="card rise tilt" href="#canteen-${p.c}" style="--i:${i};text-decoration:none;color:inherit">${dish(f)}<div class="mb"><span>${esc(f.name)}</span><span class="rt ${rc}">${rl}</span></div></a>`}).join('')}</div>`;
+ counts($('#prof'));
+}
+
+/* router + tabs */
+const views=['home','feed','canteens','canteen','top','profile'];
+function placeInd(){const a=$('.tabs a[aria-current]'),ind=$('.ind');if(!a){ind.style.width='0';return}ind.style.width=a.offsetWidth+'px';ind.style.transform=`translateX(${a.offsetLeft}px)`}
+function setNav(t){$$('[data-t]').forEach(a=>a.dataset.t===t?a.setAttribute('aria-current','page'):a.removeAttribute('aria-current'));placeInd()}
+function route(){
+ let h=location.hash.slice(1)||'home',v=h,id=null;if(h.startsWith('canteen-')){v='canteen';id=h.slice(8)}if(!views.includes(v))v='home';
+ const go=()=>{$$('.view').forEach(s=>s.hidden=s.id!=='v-'+v);
+  ({home:renderHome,feed:renderFeed,canteens:()=>renderCanteens(),canteen:()=>renderCanteen(id),top:renderTop,profile:renderProfile})[v]();
+  setNav(v==='canteen'?'canteens':v);window.scrollTo(0,0);hero.active(v==='home')};
+ if(document.startViewTransition&&!RM)document.startViewTransition(go);else go();
+}
+addEventListener('hashchange',route);addEventListener('resize',placeInd);
+
+/* toast + confetti */
+let tt;function toast(m){const t=$('#toast');t.innerHTML=CHECK+esc(m);t.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('on'),2400)}
+function confetti(x,y,n=20){if(RM)return;const cols=['#E8492F','#F2A922','#2F9E5B','#6B1E2A'];for(let i=0;i<n;i++){const s=document.createElement('i'),a=Math.random()*Math.PI*2,d=50+Math.random()*(n>10?110:50);s.className='cf';s.style.cssText=`left:${x}px;top:${y}px;background:${cols[i%4]};--dx:${Math.cos(a)*d}px;--dy:${Math.sin(a)*d-30}px;--r:${Math.random()*540}deg`;document.body.appendChild(s);setTimeout(()=>s.remove(),950)}}
+const mid=el=>{const r=el.getBoundingClientRect();return [r.left+r.width/2,r.top+r.height/2]};
+
+/* post dialog */
+const dlg=$('#dlg');
+function fillFoods(cid,fid){const fs=F.filter(f=>f.c===cid);$('#pfF').innerHTML=fs.map(f=>`<option value="${f.id}">${esc(f.name)} · Rs ${f.price}</option>`).join('')+'<option value="__new">+ Add a new food</option>';if(fid)$('#pfF').value=fid;$('#pfNew').hidden=$('#pfF').value!=='__new'}
+function openPost(cid,fid){cid=cid||S.fav||'it';$('#pfC').innerHTML=C.map(c=>`<label><input type="radio" name="pc" value="${c.id}"${c.id===cid?' checked':''}><span>${esc(c.name)}</span></label>`).join('');
+ fillFoods(cid,fid);$('#pf').reset();$$('#pfC input').forEach(i=>i.checked=i.value===cid);fillFoods(cid,fid);$('#pfErr').textContent='';$('#cnt').textContent='0/160';dlg.showModal()}
+$('#pfC').addEventListener('change',e=>fillFoods(e.target.value));
+$('#pfF').addEventListener('change',()=>{$('#pfNew').hidden=$('#pfF').value!=='__new';$('#pfErr').textContent=''});
+$('#pfT').addEventListener('input',e=>$('#cnt').textContent=e.target.value.length+'/160');
+$$('#pfN,#pfP').forEach(i=>i.addEventListener('input',()=>$('#pfErr').textContent=''));
+dlg.addEventListener('click',e=>{if(e.target===dlg)dlg.close()});
+$('#pf').addEventListener('submit',e=>{e.preventDefault();
+ const cid=$('#pfC input:checked').value,r=$('#pf').pr.value,t=$('#pfT').value.trim();let fid=$('#pfF').value;
+ if(fid==='__new'){const n=$('#pfN').value.trim(),p=+$('#pfP').value;if(!n){$('#pfErr').textContent='Enter the food name.';$('#pfN').focus();return}if(!(p>0)){$('#pfErr').textContent='Enter a price above zero.';$('#pfP').focus();return}
+  fid='f'+Date.now();F.push({id:fid,c:cid,name:n,price:Math.round(p),s:0,o:0,a:0})}
+ const f=fOf(fid);f[r]++;posts.unshift({id:Date.now(),u:S.me.name,ini:S.me.ini,fac:'IT',c:cid,f:fid,r,t:t||'No words needed.',likes:0,m:0,mine:1,new:1});
+ const [x,y]=mid($('#pf button[type=submit]'));confetti(x,y,26);dlg.close();S.filter='all';S.sort='new';
+ if(location.hash==='#feed')route();else location.hash='feed';toast('Plate posted to the feed')});
+
+/* clicks */
+document.addEventListener('click',e=>{const t=e.target.closest('[data-open-post],[data-like],[data-filter],[data-sort],[data-cs],[data-vote],[data-close]');if(!t)return;
+ if(t.hasAttribute('data-open-post')){e.preventDefault();openPost(t.dataset.c,t.dataset.f)}
+ else if(t.hasAttribute('data-close'))dlg.close();
+ else if(t.dataset.like){const p=posts.find(x=>String(x.id)===t.dataset.like);p.liked=!p.liked;p.likes+=p.liked?1:-1;
+  $$(`[data-like="${p.id}"]`).forEach(b=>{b.classList.toggle('on',p.liked);b.setAttribute('aria-pressed',p.liked);b.querySelector('span').textContent=p.likes;b.classList.remove('pop');void b.offsetWidth;if(p.liked)b.classList.add('pop')});
+  if(p.liked){const [x,y]=mid(t.querySelector('svg'));confetti(x,y,8)}}
+ else if(t.dataset.filter){S.filter=t.dataset.filter;renderFeed()}
+ else if(t.dataset.sort){S.sort=t.dataset.sort;renderFeed()}
+ else if(t.dataset.cs){S.cs=t.dataset.cs;renderCanteens()}
+ else if(t.dataset.vote){const id=t.dataset.vote,c=cOf(id);
+  if(S.fav===id){c.votes--;S.fav=null;toast('Vote removed')}
+  else{if(S.fav)cOf(S.fav).votes--;c.votes++;S.fav=id;const [x,y]=mid(t);confetti(x,y,24);toast('You voted for '+c.name)}
+  renderCanteen(id,true);const b=$('[data-vote]');b.animate&&!RM&&b.animate([{transform:'scale(.9)'},{transform:'scale(1.06)'},{transform:'scale(1)'}],{duration:450,easing:'ease-out'})}
+});
+document.addEventListener('submit',e=>{if(e.target.id!=='addFood')return;e.preventDefault();const fm=e.target,n=fm.n.value.trim(),p=+fm.p.value,cid=location.hash.slice(9)||'it';
+ if(!n){$('#afErr').textContent='Enter the food name.';fm.n.focus();return}if(!(p>0)){$('#afErr').textContent='Enter a price above zero.';fm.p.focus();return}
+ if(F.some(f=>f.c===cid&&f.name.toLowerCase()===n.toLowerCase())){$('#afErr').textContent='That food is already on the menu.';return}
+ F.push({id:'f'+Date.now(),c:cid,name:n,price:Math.round(p),s:0,o:0,a:0});renderCanteen(cid,true);toast(n+' added to the menu')});
+document.addEventListener('input',e=>{if(e.target.id==='cq'){S.q=e.target.value;renderCanteens(true)}if(e.target.closest&&e.target.closest('#addFood'))$('#afErr').textContent=''});
+
+/* card tilt */
+document.addEventListener('pointermove',e=>{if(RM||e.pointerType!=='mouse')return;const el=e.target.closest('.tilt');if(!el)return;const r=el.getBoundingClientRect();
+ el.style.setProperty('--rx',(((e.clientY-r.top)/r.height-.5)*-6).toFixed(2)+'deg');el.style.setProperty('--ry',(((e.clientX-r.left)/r.width-.5)*8).toFixed(2)+'deg')});
+document.addEventListener('pointerout',e=>{const el=e.target.closest&&e.target.closest('.tilt');if(el&&!el.contains(e.relatedTarget)){el.style.setProperty('--rx','0deg');el.style.setProperty('--ry','0deg')}});
+
+/* 3D hero */
+const hero=(()=>{const box=$('#stage');if(!window.THREE){box.classList.add('nogl');return{active(){}}}
+ const T=THREE;let R;try{R=new T.WebGLRenderer({antialias:true,alpha:true})}catch(err){box.classList.add('nogl');return{active(){}}}
+ R.setPixelRatio(Math.min(devicePixelRatio,2));box.appendChild(R.domElement);R.domElement.setAttribute('aria-hidden','true');
+ const sc=new T.Scene(),cam=new T.PerspectiveCamera(32,1,.1,100),dir=new T.Vector3(0,.46,.89).normalize();
+ sc.add(new T.HemisphereLight(0xfff4e4,0x6b1e2a,.95));const key=new T.DirectionalLight(0xffffff,1.05);key.position.set(4,8,5);sc.add(key);const rim=new T.DirectionalLight(0xf2a922,.55);rim.position.set(-5,3,-4);sc.add(rim);
+ const std=(c,r=.5)=>new T.MeshStandardMaterial({color:c,roughness:r,metalness:0});
+ let seed=11;const rnd=()=>(seed=seed*16807%2147483647)/2147483647;
+ const grad=(a,b)=>{const cv=document.createElement('canvas');cv.width=cv.height=128;const g=cv.getContext('2d'),gr=g.createRadialGradient(64,64,0,64,64,64);gr.addColorStop(0,a);gr.addColorStop(1,b);g.fillStyle=gr;g.fillRect(0,0,128,128);return new T.CanvasTexture(cv)};
+ const shadow=new T.Mesh(new T.PlaneGeometry(6.4,6.4),new T.MeshBasicMaterial({map:grad('rgba(70,20,28,.42)','rgba(70,20,28,0)'),transparent:true,depthWrite:false}));shadow.rotation.x=-Math.PI/2;shadow.position.y=-1.05;sc.add(shadow);
+ const G=new T.Group(),spin=new T.Group();sc.add(G);G.add(spin);
+ const prof=[[0,0],[1.5,0],[1.66,.05],[1.95,.2],[2.25,.31],[2.32,.29],[2.02,.14],[1.62,.1],[0,.1]].map(p=>new T.Vector2(p[0],p[1]));
+ const plate=new T.Mesh(new T.LatheGeometry(prof,96),std(0xfffaf3,.32));plate.material.side=T.DoubleSide;spin.add(plate);
+ const ring=new T.Mesh(new T.TorusGeometry(2.29,.04,12,140),std(0x6b1e2a,.4));ring.rotation.x=Math.PI/2;ring.position.y=.31;spin.add(ring);
+ const shares=[.45,.33,.22],gap=.09,segDefs=[[0xe8492f,[0xb5652b,0x4e8f3a,0xf6c453],'box'],[0xf2a922,[0xfff6e0,0xe07a1f],'ball'],[0x2f9e5b,[0x8bd17c,0x1f6b3d],'leaf']];
+ const bitG={box:new T.BoxGeometry(.13,.07,.13),ball:new T.SphereGeometry(.075,10,8),leaf:new T.SphereGeometry(.13,10,6)};
+ let a0=Math.PI/2;const segs=segDefs.map(([col,bits,shape],i)=>{const a1=a0+gap/2,a2=a0+shares[i]*Math.PI*2-gap/2;a0+=shares[i]*Math.PI*2;
+  const sh=new T.Shape();sh.absarc(0,0,1.45,a1,a2,false);sh.absarc(0,0,.42,a2,a1,true);
+  const m=new T.Mesh(new T.ExtrudeGeometry(sh,{depth:.2,bevelEnabled:true,bevelThickness:.06,bevelSize:.05,bevelSegments:4,curveSegments:36}),std(col,.6));m.rotation.x=-Math.PI/2;
+  const pv=new T.Group();pv.position.y=.1;pv.add(m);
+  for(let j=0;j<16;j++){const b=new T.Mesh(bitG[shape],std(bits[j%bits.length],.55)),a=a1+.1+rnd()*(a2-a1-.2),rr=.6+rnd()*.72;b.position.set(Math.cos(a)*rr,.3,-Math.sin(a)*rr);b.rotation.set(rnd()*3,rnd()*3,rnd()*3);if(shape==='leaf')b.scale.set(1,.3,.6);pv.add(b)}
+  spin.add(pv);return pv});
+ const dot=new T.Mesh(new T.CylinderGeometry(.24,.28,.3,32),std(0x6b1e2a,.4));dot.position.y=.25;spin.add(dot);
+ const mar=std(0x6b1e2a,.38),fork=new T.Group(),spoon=new T.Group(),at=(g,x,y)=>{const m=new T.Mesh(g,mar);m.position.set(x,y,0);return m};
+ fork.add(at(new T.BoxGeometry(.17,2,.08),0,-.5));
+ fork.add(at(new T.BoxGeometry(.5,.14,.08),0,.55));
+ [-.2,0,.2].forEach(x=>fork.add(at(new T.BoxGeometry(.07,.62,.07),x,.92)));
+ spoon.add(at(new T.BoxGeometry(.17,2,.08),0,-.5));
+ const bowl=new T.Mesh(new T.SphereGeometry(.4,28,20),mar);bowl.scale.set(.85,1.2,.3);bowl.position.y=.85;spoon.add(bowl);
+ sc.add(fork,spoon);
+ const floats=[[new T.SphereGeometry(.2,24,16),0xe8492f,[-3.1,1.9,-1]],[new T.TorusGeometry(.17,.07,12,28),0xf2a922,[3.2,2.1,-.6]],[new T.BoxGeometry(.3,.3,.3),0xf6c453,[-2.6,-.4,1.6]],[new T.SphereGeometry(.22,16,10),0x2f9e5b,[2.7,-.3,1.7]],[new T.SphereGeometry(.12,16,12),0x4e8f3a,[1.2,2.6,-1.6]],[new T.TorusGeometry(.14,.06,12,28),0xe8492f,[-1.4,2.7,-1.4]]].map(([g,c,p],i)=>{const m=new T.Mesh(g,std(c,.5));m.position.set(...p);if(i===3)m.scale.set(1,.35,.65);m.userData={y:p[1],ph:i*1.3};sc.add(m);return m});
+ const steamM=new T.SpriteMaterial({map:grad('rgba(255,255,255,.9)','rgba(255,255,255,0)'),transparent:true,depthWrite:false});
+ const steam=[0,1,2,3,4].map(i=>{const s=new T.Sprite(steamM.clone());s.userData={o:i/5,x:(i%3-1)*.45};sc.add(s);return s});
+ let w=1,h=1,mx=0,my=0,tx=0,ty=0,on=false,vis=true,raf=0,t0=performance.now();
+ function size(){w=box.clientWidth;h=box.clientHeight;if(!w||!h)return;R.setSize(w,h,false);cam.aspect=w/h;const d=Math.max(10.4,14/cam.aspect);cam.position.copy(dir).multiplyScalar(d);cam.lookAt(0,.15,0);cam.updateProjectionMatrix();if(RM||!on)draw(9)}
+ const ease=k=>1-Math.pow(1-Math.min(Math.max(k,0),1),3),back=k=>{k=Math.min(Math.max(k,0),1);const c=1.70158;return 1+(c+1)*Math.pow(k-1,3)+c*Math.pow(k-1,2)};
+ function draw(t){const k=ease(t/1.3),bob=Math.sin(t*1.3)*.09*k;
+  G.position.y=(1-k)*3.4+bob;shadow.scale.setScalar(.75+k*.25-bob*.6);shadow.material.opacity=k;
+  segs.forEach((s,i)=>{const p=back((t-.8-i*.22)/.65);s.scale.set(.5+.5*p,Math.max(p,.001),.5+.5*p)});
+  spin.rotation.y=t*.22;tx+=(mx-tx)*.06;ty+=(my-ty)*.06;
+  const sy=Math.min(scrollY/innerHeight,1);G.rotation.x=.12+ty*.35+sy*.5;G.rotation.z=-tx*.25;
+  const u=ease((t-1.4)/.9);fork.position.set(-3-(1-u)*4,.6+Math.sin(t*1.1)*.14,.4);fork.rotation.set(-.2,0,.22-tx*.2);spoon.position.set(3+(1-u)*4,.6+Math.sin(t*1.1+1.5)*.14,.4);spoon.rotation.set(-.2,0,-.22-tx*.2);
+  floats.forEach((m,i)=>{const fu=ease((t-1.6-i*.08)/.8);m.position.y=m.userData.y+Math.sin(t*1.2+m.userData.ph)*.22-(1-fu)*2;m.rotation.x=t*.6+i;m.rotation.y=t*.4+i;const fs=Math.max(fu,.001);if(i===3)m.scale.set(fs,.35*fs,.65*fs);else m.scale.setScalar(fs)});
+  steam.forEach(s=>{const q=((t*.28+s.userData.o)%1),sk=ease((t-2.2)/1);s.position.set(s.userData.x+Math.sin(q*6+s.userData.o*9)*.12,G.position.y+.7+q*2.2,0);s.scale.setScalar(.55+q*.9);s.material.opacity=Math.sin(q*Math.PI)*.55*sk});
+  R.render(sc,cam)}
+ function loop(n){if(!on||!vis){raf=0;return}draw((n-t0)/1000);raf=requestAnimationFrame(loop)}
+ const start=()=>{if(RM){draw(9);return}if(!raf&&on&&vis)raf=requestAnimationFrame(loop)};
+ box.addEventListener('pointermove',e=>{const r=box.getBoundingClientRect();mx=(e.clientX-r.left)/r.width-.5;my=(e.clientY-r.top)/r.height-.5});
+ box.addEventListener('pointerleave',()=>{mx=0;my=0});
+ const ro=new ResizeObserver(size);ro.observe(box);
+ const io=new IntersectionObserver(es=>{vis=es[0].isIntersecting;start()});io.observe(box);
+ let first=true;return{active(v){on=v;if(v){if(first){t0=performance.now();first=false}size();start()}}};
+})();
+
+document.fonts&&document.fonts.ready.then(placeInd);
+route();
+}
+</script>
+</body>
+</html>

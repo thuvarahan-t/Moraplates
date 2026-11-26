@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MoraPlates new post</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,700;12..96,800&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#6B1E2A}a:hover{color:#C23A22}
+textarea::placeholder{color:#8A7770}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #FFF4E4; font-family: 'Bricolage Grotesque', sans-serif; color: #2A1A17; display: flex; flex-direction: column; padding: 14px 20px 24px; gap: 16px">
+  <div style="display: flex; align-items: center; justify-content: space-between">
+    <a href="Feed.dc.html" aria-label="Close" style="width: 44px; height: 44px; border-radius: 999px; background: #FFFFFF; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6B1E2A" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6l-12 12M6 6l12 12"></path></svg>
+    </a>
+    <div style="font-size: 18px; font-weight: 800; color: #6B1E2A">Post your plate</div>
+    <div style="width: 44px"></div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 8px">
+    <div style="font-size: 15px; font-weight: 700">Where did you eat?</div>
+    <div style="display: flex; gap: 8px; overflow: hidden">
+      <button style="flex-shrink: 0; padding: 9px 14px; border-radius: 999px; border: 2px solid #6B1E2A; background: #6B1E2A; color: #FFF4E4; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer">IT canteen</button>
+      <button style="flex-shrink: 0; padding: 9px 14px; border-radius: 999px; border: 1px solid #EADBC8; background: #FFFFFF; color: #6B1E2A; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer">Main canteen</button>
+      <button style="flex-shrink: 0; padding: 9px 14px; border-radius: 999px; border: 1px solid #EADBC8; background: #FFFFFF; color: #6B1E2A; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer">Civil canteen</button>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 8px">
+    <div style="font-size: 15px; font-weight: 700">What did you eat?</div>
+    <button style="height: 52px; border-radius: 14px; border: 1px solid #EADBC8; background: #FFFFFF; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; font: inherit; cursor: pointer; color: #2A1A17">
+      <span style="font-size: 16px; font-weight: 600">Chicken kottu <span style="font-weight: 400; color: #6E5A54">· Rs 450</span></span>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B1E2A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6l6 -6"></path></svg>
+    </button>
+    <div style="font-size: 13px; color: #6E5A54">Not on the menu? <a href="NewPost.dc.html" style="font-weight: 600">Add a new food</a></div>
+  </div>
+
+  <button style="height: 112px; border-radius: 16px; border: 2px dashed #D9BFA6; background: #FFFBF5; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #8A5A44; font: inherit; cursor: pointer">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7h1a2 2 0 0 0 2 -2a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1a2 2 0 0 0 2 2h1a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-9a2 2 0 0 1 2 -2"></path><circle cx="12" cy="13" r="3"></circle></svg>
+    <span style="font-size: 14px; font-weight: 600">Add a photo <span style="font-weight: 400">(optional)</span></span>
+  </button>
+
+  <div style="display: flex; flex-direction: column; gap: 8px">
+    <div style="font-size: 15px; font-weight: 700">How was it?</div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+      <sc-for list="{{ratings}}" as="r" hint-placeholder-count="3">
+        <button onClick="{{r.pick}}" aria-pressed="{{r.pressed}}" style="height: 72px; border-radius: 16px; border: 2px solid {{r.border}}; background: {{r.bg}}; color: {{r.color}}; font: inherit; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px">
+          <span style="font-size: 17px; font-weight: 800">{{r.label}}</span>
+          <span style="font-size: 12px">{{r.sub}}</span>
+        </button>
+      </sc-for>
+    </div>
+  </div>
+
+  <label style="display: flex; flex-direction: column; gap: 8px">
+    <span style="font-size: 15px; font-weight: 700">Say something</span>
+    <textarea rows="3" placeholder="Spicy? Cold? Worth the queue?" style="border-radius: 14px; border: 1px solid #EADBC8; background: #FFFFFF; padding: 12px 14px; font: inherit; font-size: 15px; color: #2A1A17; resize: none; outline: none"></textarea>
+  </label>
+
+  <a href="Feed.dc.html" style="margin-top: auto; display: flex; align-items: center; justify-content: center; gap: 8px; height: 56px; border-radius: 999px; background: #6B1E2A; color: #FFF4E4; font-size: 17px; font-weight: 700; text-decoration: none">
+    Post to feed
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6l-6 6"></path></svg>
+  </a>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { rating: 'super' };
+  }
+  renderVals() {
+    const opts = [
+      { id: 'super', label: 'Super', sub: 'Would eat again', bg: '#E3F3E8', border: '#2F9E5B', color: '#1F6B3D' },
+      { id: 'okay', label: 'Okay', sub: "It's fine", bg: '#FDF0D2', border: '#F2A922', color: '#7A5200' },
+      { id: 'avoid', label: 'Avoid', sub: 'Skip it', bg: '#FBE3DE', border: '#E8492F', color: '#A3301B' }
+    ];
+    return {
+      ratings: opts.map((o) => {
+        const sel = this.state.rating === o.id;
+        return {
+          label: o.label,
+          sub: o.sub,
+          pressed: sel ? 'true' : 'false',
+          bg: sel ? o.bg : '#FFFFFF',
+          border: sel ? o.border : '#EADBC8',
+          color: sel ? o.color : '#4A3A35',
+          pick: () => this.setState({ rating: o.id })
+        };
+      })
+    };
+  }
+}
+</script>
+</body>
+</html>

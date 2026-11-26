@@ -1,0 +1,16 @@
+# dependencies and builds
+node_modules/
+dist/
+
+# secrets: Supabase keys and access token live here, never commit them
+.env
+.env.*
+!.env.example
+
+# the handoff is committed unzipped
+*.zip
+
+# editor and OS files
+.vscode/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MoraPlates animated logo</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#6B1E2A}a:hover{color:#E8492F}
+.a{animation-fill-mode:both;animation-timing-function:cubic-bezier(.2,.9,.3,1.15)}
+.fb{transform-box:fill-box;transform-origin:center}
+@keyframes pop{0%{transform:scale(0) rotate(-140deg)}70%{transform:scale(1.08) rotate(10deg)}100%{transform:scale(1) rotate(0)}}
+@keyframes draw{from{stroke-dashoffset:var(--l)}to{stroke-dashoffset:0}}
+@keyframes slideL{from{transform:translateX(-70px) rotate(-35deg);opacity:0}to{transform:none;opacity:1}}
+@keyframes slideR{from{transform:translateX(70px) rotate(35deg);opacity:0}to{transform:none;opacity:1}}
+@keyframes steam{0%{transform:translateY(12px);opacity:0}35%{opacity:1}100%{transform:translateY(-20px);opacity:0}}
+@keyframes up{from{transform:translateY(46px);opacity:0}to{transform:none;opacity:1}}
+@keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes dot{0%,100%{transform:scale(1)}50%{transform:scale(1.35)}}
+.rp{font:500 15px 'Bricolage Grotesque',sans-serif;color:#6B1E2A;background:#FFFFFF;border:2px solid #6B1E2A;border-radius:999px;padding:12px 22px;min-height:44px;cursor:pointer;display:flex;align-items:center;gap:8px}
+.rp:hover{background:#6B1E2A;color:#FFF4E4}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</helmet>
+<div style="width: 1200px; height: 675px; box-sizing: border-box; background: #FFF4E4; position: relative; overflow: hidden; font-family: 'Bricolage Grotesque', sans-serif; display: flex; align-items: center; justify-content: center">
+  <div style="position: absolute; top: 32px; left: 40px; font-size: 14px; color: #7A5A50; letter-spacing: 0.04em">MoraPlates · logo animation v1</div>
+
+  <sc-if value="{{on}}" hint-placeholder-val="{{ true }}">
+    <div style="display: flex; align-items: center; gap: 40px">
+      <svg width="330" height="268" viewBox="0 0 320 260" role="img" aria-label="MoraPlates logo: a plate with a three-part donut of food, a fork and a spoon">
+        <g fill="none" stroke="#E8492F" stroke-width="5" stroke-linecap="round">
+          <path class="a" d="M138 52 q-9 -11 0 -21 q9 -10 0 -21" style="animation: steam 2.4s ease-in-out 2.1s infinite"></path>
+          <path class="a" d="M160 48 q-9 -11 0 -21 q9 -10 0 -21" style="animation: steam 2.4s ease-in-out 2.5s infinite"></path>
+          <path class="a" d="M182 52 q-9 -11 0 -21 q9 -10 0 -21" style="animation: steam 2.4s ease-in-out 2.9s infinite"></path>
+        </g>
+        <g class="a fb" style="animation: slideL 0.7s 1.5s">
+          <g stroke="#6B1E2A" stroke-width="6" stroke-linecap="round" fill="none">
+            <line x1="30" y1="92" x2="30" y2="120"></line>
+            <line x1="42" y1="92" x2="42" y2="120"></line>
+            <line x1="54" y1="92" x2="54" y2="120"></line>
+            <path d="M30 120 q12 18 24 0"></path>
+            <line x1="42" y1="132" x2="42" y2="222" stroke-width="9"></line>
+          </g>
+        </g>
+        <g class="a fb" style="animation: slideR 0.7s 1.6s">
+          <ellipse cx="278" cy="110" rx="14" ry="20" fill="#6B1E2A"></ellipse>
+          <line x1="278" y1="128" x2="278" y2="222" stroke="#6B1E2A" stroke-width="9" stroke-linecap="round"></line>
+        </g>
+        <g class="a fb" style="animation: pop 0.8s 0.1s">
+          <circle cx="160" cy="150" r="88" fill="#FFFFFF" stroke="#6B1E2A" stroke-width="6"></circle>
+          <circle class="a" cx="160" cy="150" r="70" fill="none" stroke="#6B1E2A" stroke-opacity="0.3" stroke-width="2.5" stroke-dasharray="440" style="--l: 440; animation: draw 0.6s ease-out 0.6s"></circle>
+          <circle class="a" cx="160" cy="150" r="30" fill="none" stroke="#E8492F" stroke-width="60" stroke-dasharray="80.8 200" transform="rotate(-90 160 150)" style="--l: 80.8; animation: draw 0.45s ease-out 0.85s"></circle>
+          <circle class="a" cx="160" cy="150" r="30" fill="none" stroke="#F2A922" stroke-width="60" stroke-dasharray="58.2 200" transform="rotate(72 160 150)" style="--l: 58.2; animation: draw 0.4s ease-out 1.2s"></circle>
+          <circle class="a" cx="160" cy="150" r="30" fill="none" stroke="#2F9E5B" stroke-width="60" stroke-dasharray="37.5 200" transform="rotate(190.8 160 150)" style="--l: 37.5; animation: draw 0.35s ease-out 1.5s"></circle>
+          <circle cx="160" cy="150" r="17" fill="#FFFFFF"></circle>
+          <circle class="a fb" cx="160" cy="150" r="7" fill="#6B1E2A" style="animation: dot 0.5s ease-in-out 1.9s"></circle>
+        </g>
+      </svg>
+
+      <div style="display: flex; flex-direction: column; gap: 14px">
+        <div style="font-size: 106px; font-weight: 800; line-height: 0.95; letter-spacing: -0.035em; display: flex">
+          <span class="a" style="display: inline-block; color: #6B1E2A; animation: up 0.55s 1.9s">M</span>
+          <span class="a" style="display: inline-block; color: #6B1E2A; animation: up 0.55s 1.96s">o</span>
+          <span class="a" style="display: inline-block; color: #6B1E2A; animation: up 0.55s 2.02s">r</span>
+          <span class="a" style="display: inline-block; color: #6B1E2A; animation: up 0.55s 2.08s">a</span>
+          <span class="a" style="display: inline-block; color: #E8492F; animation: up 0.55s 2.18s">P</span>
+          <span class="a" style="display: inline-block; color: #E8492F; animation: up 0.55s 2.24s">l</span>
+          <span class="a" style="display: inline-block; color: #E8492F; animation: up 0.55s 2.3s">a</span>
+          <span class="a" style="display: inline-block; color: #E8492F; animation: up 0.55s 2.36s">t</span>
+          <span class="a" style="display: inline-block; color: #E8492F; animation: up 0.55s 2.42s">e</span>
+          <span class="a" style="display: inline-block; color: #E8492F; animation: up 0.55s 2.48s">s</span>
+        </div>
+        <div class="a" style="font-size: 28px; font-weight: 500; color: #6B1E2A; animation: fade 0.6s ease-out 2.75s">Rate it. Vote it. Eat it.</div>
+        <div class="a" style="font-size: 17px; color: #7A5A50; animation: fade 0.6s ease-out 3s">Every Mora canteen, rated by the students who eat there.</div>
+      </div>
+    </div>
+  </sc-if>
+
+  <button class="rp" style="position: absolute; right: 40px; bottom: 32px" onClick="{{replay}}" aria-label="Replay logo animation">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"></path><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"></path></svg>
+    Replay
+  </button>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1200,"height":675}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { on: true };
+  }
+  renderVals() {
+    return {
+      on: this.state.on,
+      replay: () => {
+        this.setState({ on: false });
+        setTimeout(() => this.setState({ on: true }), 40);
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>
