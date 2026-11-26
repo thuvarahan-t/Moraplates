@@ -1,25 +1,26 @@
 import { useState } from 'react'
+import { Navigate, useParams } from 'react-router'
 import { Link } from '../components/NavLinks'
+import Avatar from '../components/Avatar'
 import CountUp from '../components/CountUp'
 import Dish from '../components/Dish'
-import { CheckIcon, HeartIcon, LockIcon, LogOutIcon, PencilIcon } from '../components/icons'
-import { useAuth, initialsOf } from '../lib/auth'
+import { BackIcon, CameraIcon, CheckIcon, HeartIcon, LockIcon, LogOutIcon, PencilIcon } from '../components/icons'
+import { useAuth } from '../lib/auth'
 import { badgesFor } from '../lib/badges'
 import { useFx } from '../lib/fx'
 import { RATING } from '../lib/format'
 import { usePost } from '../lib/post'
 import { supabase } from '../lib/supabase'
 import { useQuery } from '../data/useQuery'
-import { fetchProfilePage, friendly, updateProfile } from '../data/queries'
+import { fetchProfilePage, fetchPublicProfile, friendly, updateAvatar, updateProfile } from '../data/queries'
 
 const TONES = { leaf: ['var(--sb)', 'var(--st)'], mus: ['var(--ob)', 'var(--ot)'], tom: ['var(--ab)', 'var(--at)'] }
-const LOCK = <LockIcon />
 
+/** /profile: the signed-in student's own profile. */
 export default function Profile() {
   const { session, profile, ready } = useAuth()
 
   if (!ready) return <section className="view" />
-
   if (!supabase || !session) {
     return (
       <section className="view"><div className="band"><div className="wrap narrow">
@@ -32,33 +33,112 @@ export default function Profile() {
     )
   }
   if (!profile) return <section className="view" />
-  return <SignedIn uid={session.user.id} email={session.user.email} profile={profile} />
+  return <OwnProfile uid={session.user.id} email={session.user.email} profile={profile} />
 }
 
-function SignedIn({ uid, email, profile }) {
-  const { signOut } = useAuth()
-  const { openPost } = usePost()
-  const { data } = useQuery(() => fetchProfilePage(uid), [uid])
-  // New accounts get the email name ("thuvarahant.23"); nudge them to set a real one.
-  const [editing, setEditing] = useState(false)
-  const needsName = profile.fullName === email.split('@')[0]
+/** /u/:id: anyone's public profile, opened by tapping a name or photo on a post. */
+export function UserProfile() {
+  const { id } = useParams()
+  const { session } = useAuth()
+  const uid = session?.user?.id
+  const { data, error, loading } = useQuery(() => fetchPublicProfile(id, uid), [id, uid])
 
-  const s = data?.stats
-  const badges = badgesFor(s)
+  if (uid && id === uid) return <Navigate to="/profile" replace />
+  if (loading && !data) return <section className="view" />
+  if (error || !data) {
+    return (
+      <section className="view"><div className="band"><div className="wrap narrow">
+        <div className="card empty"><h3>{error ? "Couldn't load this profile" : 'Student not found'}</h3><p>{error ? 'Check your connection and try again.' : 'They may have deleted their account.'}</p></div>
+      </div></div></section>
+    )
+  }
+  const p = data.profile
+  return (
+    <ProfileBody
+      top={<button className="back linkish" onClick={() => history.back()}><BackIcon />Back</button>}
+      head={<>
+        <Avatar name={p.fullName} url={p.avatar} />
+        <div className="who"><b>{p.fullName}</b><span style={{ color: 'var(--mut)' }}>{[p.faculty, p.batch].filter(Boolean).join(' · ') || 'Mora student'}</span></div>
+      </>}
+      stats={data.stats}
+      posts={data.posts}
+      platesTitle={`${p.fullName.split(' ')[0]}'s plates`}
+      emptyPlates="No plates yet."
+    />
+  )
+}
+
+function OwnProfile({ uid, email, profile }) {
+  const { signOut, refreshProfile } = useAuth()
+  const { openPost } = usePost()
+  const { toast } = useFx()
+  const { data } = useQuery(() => fetchProfilePage(uid), [uid])
+  const [editing, setEditing] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  // New accounts start with the email name ("thuvarahant.23"); nudge them to set a real one.
+  const needsName = profile.fullName === email.split('@')[0]
   const sub = [profile.faculty, profile.batch].filter(Boolean).join(' · ') || email
 
+  const pickAvatar = async e => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setUploading(true)
+    try {
+      await updateAvatar(uid, file, profile.avatarPath)
+      refreshProfile()
+      toast('Profile photo updated')
+    } catch (err) {
+      toast(friendly(err))
+    } finally {
+      setUploading(false)
+    }
+  }
+
   return (
-    <section className="view"><div className="band"><div className="wrap">
-      <div className="card pro rise">
-        <span className="av">{initialsOf(profile.fullName)}</span>
-        <div className="who"><b>{profile.fullName}</b><span style={{ color: 'var(--mut)' }}>{sub}</span></div>
+    <ProfileBody
+      head={<>
+        <label className={'avpick' + (uploading ? ' busy' : '')} title="Change profile photo">
+          <Avatar name={profile.fullName} url={profile.avatar} />
+          <span className="avcam" aria-hidden="true"><CameraIcon size={16} /></span>
+          <input type="file" accept="image/*" onChange={pickAvatar} disabled={uploading} aria-label="Change profile photo" hidden />
+        </label>
+        <div className="who"><b>{profile.fullName}</b><span style={{ color: 'var(--mut)' }}>{uploading ? 'Uploading photo…' : sub}</span></div>
         <div className="pro-acts">
-          <button className="btn sm ghost" onClick={() => setEditing(e => !e)}>{editing ? 'Close' : <><PencilIcon />Edit profile</>}</button>
+          <button className="btn sm ghost" onClick={() => setEditing(v => !v)}>{editing ? 'Close' : <><PencilIcon />Edit profile</>}</button>
           <button className="btn sm" onClick={() => openPost()}>Post your plate</button>
         </div>
-      </div>
+      </>}
+      below={(editing || needsName) && <EditProfile uid={uid} profile={profile} onDone={() => setEditing(false)} />}
+      extra={data?.favCanteen ? (
+        <Link className="card ccard rise tilt" to={`/canteens/${data.favCanteen.id}`} style={{ '--i': 2, boxShadow: 'inset 0 0 0 2px var(--leaf)' }}>
+          <span className="rank" style={{ background: 'var(--sb)', color: 'var(--st)' }}><HeartIcon /></span>
+          <div className="cb"><small>Your vote this week</small><span className="cn">{data.favCanteen.name}</span></div>
+          <span style={{ fontWeight: 700, alignSelf: 'center' }}>Change</span>
+        </Link>
+      ) : data && (
+        <Link className="card ccard rise tilt" to="/top" style={{ '--i': 2 }}>
+          <span className="rank"><HeartIcon /></span>
+          <div className="cb"><span className="cn">Pick your favourite canteen</span><small>You haven't voted this week. Tap to vote.</small></div>
+        </Link>
+      )}
+      stats={data?.stats}
+      posts={data?.posts}
+      platesTitle="Your plates"
+      emptyPlates="No plates yet. Tap + to post your first one."
+      after={<button className="btn ghost sm signout" onClick={signOut}><LogOutIcon />Sign out</button>}
+    />
+  )
+}
 
-      {(editing || needsName) && <EditProfile uid={uid} profile={profile} onDone={() => setEditing(false)} />}
+/** Layout shared by your own profile and other students' profiles. */
+function ProfileBody({ top, head, below, extra, stats: s, posts, platesTitle, emptyPlates, after }) {
+  const badges = badgesFor(s)
+  return (
+    <section className="view"><div className="band"><div className="wrap">
+      {top}
+      <div className="card pro rise">{head}</div>
+      {below}
 
       <div className="stats rise" style={{ '--i': 1 }}>
         <div><CountUp to={s?.plates ?? 0} /><span>plates posted</span></div>
@@ -67,18 +147,7 @@ function SignedIn({ uid, email, profile }) {
         <div><CountUp to={s?.super_given ?? 0} /><span>Super ratings given</span></div>
       </div>
 
-      {data?.favCanteen ? (
-        <Link className="card ccard rise tilt" to={`/canteens/${data.favCanteen.id}`} style={{ '--i': 2, boxShadow: 'inset 0 0 0 2px var(--leaf)' }}>
-          <span className="rank" style={{ background: 'var(--sb)', color: 'var(--st)' }}><HeartIcon /></span>
-          <div className="cb"><small>Your vote this week</small><span className="cn">{data.favCanteen.name}</span></div>
-          <span style={{ fontWeight: 700, alignSelf: 'center' }}>Change</span>
-        </Link>
-      ) : (
-        <Link className="card ccard rise tilt" to="/canteens" style={{ '--i': 2 }}>
-          <span className="rank"><HeartIcon /></span>
-          <div className="cb"><span className="cn">Pick your favourite canteen</span><small>You haven't voted this week. Open a canteen and tap Vote.</small></div>
-        </Link>
-      )}
+      {extra}
 
       <h3 className="sec">Badges</h3>
       <div className="badges">
@@ -86,16 +155,16 @@ function SignedIn({ uid, email, profile }) {
           const [bg, fg] = b.earned ? TONES[b.tone] : ['var(--chip)', 'var(--mut)']
           return (
             <div key={b.id} className={'card bdg rise' + (b.earned ? '' : ' lock')} style={{ '--i': i }}>
-              <span className="si" style={{ background: bg, color: fg }}>{b.earned ? <CheckIcon /> : LOCK}</span>
+              <span className="si" style={{ background: bg, color: fg }}>{b.earned ? <CheckIcon /> : <LockIcon />}</span>
               <div><b>{b.name}</b><small>{b.earned ? b.how : `${b.how} · ${b.have}/${b.goal}`}</small></div>
             </div>
           )
         })}
       </div>
 
-      <h3 className="sec">Your plates</h3>
+      <h3 className="sec">{platesTitle}</h3>
       <div className="mine">
-        {data?.posts.map((p, i) => {
+        {posts?.map((p, i) => {
           const [rl, rc] = RATING[p.rating]
           return (
             <Link key={p.id} className="card rise tilt" to={`/canteens/${p.canteenId}`} style={{ '--i': i, textDecoration: 'none', color: 'inherit' }}>
@@ -105,9 +174,8 @@ function SignedIn({ uid, email, profile }) {
           )
         })}
       </div>
-      {data && !data.posts.length && <p style={{ color: 'var(--mut)' }}>No plates yet. Tap + to post your first one.</p>}
-
-      <button className="btn ghost sm signout" onClick={signOut}><LogOutIcon />Sign out</button>
+      {posts && !posts.length && <p style={{ color: 'var(--mut)' }}>{emptyPlates}</p>}
+      {after}
     </div></div></section>
   )
 }
