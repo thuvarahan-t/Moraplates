@@ -32,6 +32,7 @@ export default function Dropdown({
   const pop = useRef(null)
   const search = useRef(null)
   const listId = useId()
+  const valueId = `${listId}-value`
   const current = options.find(o => o.value === value)
   const q = norm(query)
 
@@ -91,12 +92,14 @@ export default function Dropdown({
     <div className={'dd' + (open ? ' open' : '')} ref={box}>
       <button
         type="button" ref={btn} className="dd-btn" disabled={disabled}
-        aria-haspopup="listbox" aria-expanded={open} aria-controls={listId} aria-labelledby={labelId}
+        role={searchable ? undefined : 'combobox'}
+        aria-haspopup="listbox" aria-expanded={open} aria-controls={open ? listId : undefined} aria-labelledby={labelId}
+        aria-describedby={searchable ? undefined : valueId}
         aria-activedescendant={activeId}
         onClick={() => setOpen(o => !o)} onKeyDown={e => onKey(e)}
       >
         {current?.dot && <span className="dd-dot" style={{ background: current.dot }} />}
-        <span className={'dd-val' + (current ? '' : ' dd-empty-val')}>
+        <span id={valueId} className={'dd-val' + (current ? '' : ' dd-empty-val')}>
           <b>{current?.label ?? placeholder}</b>
           {current?.sub && <small>{current.sub}</small>}
         </span>
