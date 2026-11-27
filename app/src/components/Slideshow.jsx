@@ -5,15 +5,15 @@ import { REDUCED_MOTION } from '../lib/motion'
  * Cross-fading photo slideshow that fills its (position:relative) parent.
  * `children(current, index, goTo)` renders overlays such as the credit chip and dots.
  */
-export default function Slideshow({ photos, interval = 4500, playing = true, children }) {
+export default function Slideshow({ photos, interval = 4500, children }) {
   const [i, setI] = useState(0)
   const n = photos.length
 
   useEffect(() => {
-    if (REDUCED_MOTION || !playing || n < 2) return
+    if (REDUCED_MOTION || n < 2) return
     const t = setInterval(() => { if (!document.hidden) setI(x => (x + 1) % n) }, interval)
     return () => clearInterval(t)
-  }, [n, interval, playing])
+  }, [n, interval])
 
   const idx = n ? i % n : 0
   return (

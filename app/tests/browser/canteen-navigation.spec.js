@@ -1,16 +1,11 @@
 import { expect, test } from '@playwright/test'
 
-test('home slideshow can select a canteen and respects reduced motion', async ({ page }) => {
+test('the home slideshow is hidden without photos and the header respects reduced motion', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.goto('/')
 
-  const slideshow = page.getByRole('region', { name: 'Canteen slideshow' })
-  await expect(slideshow.getByRole('button', { name: 'Show canteen 1' })).toHaveAttribute('aria-current', 'true')
+  await expect(page.getByRole('region', { name: 'Canteen slideshow' })).toHaveCount(0)
   await expect(page.locator('.brand-wordmark')).toHaveCSS('animation-name', 'none')
-  await slideshow.getByRole('button', { name: 'Show canteen 2' }).click()
-  await expect(slideshow.getByRole('button', { name: 'Show canteen 2' })).toHaveAttribute('aria-current', 'true')
-  await slideshow.getByRole('link', { name: 'Main canteen, see the canteen' }).click()
-  await expect(page).toHaveURL(/\/canteens\/main$/)
 })
 
 test('food links show only that food’s plates and handle empty menus', async ({ page }) => {

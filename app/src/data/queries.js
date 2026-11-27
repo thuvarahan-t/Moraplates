@@ -2,7 +2,7 @@
 import { supabase } from '../lib/supabase'
 import { photoUrl, uploadPhoto, compressImage } from '../lib/photos'
 import { isMissingSeenSchema, queryWithSeenFallback } from '../lib/optionalSchema'
-import { byVotes } from '../lib/food'
+import { byVotes, HOME_CANTEEN_PHOTO_LIMIT } from '../lib/food'
 import { BADGES, isVerifiedProfile } from '../lib/badges'
 
 const need = () => { if (!supabase) throw new Error('This needs a Supabase project. Add keys to .env.') }
@@ -226,21 +226,34 @@ export async function addCanteen(userId, { name, location, lat, lng, opensAt, cl
 
 // ---------------------------------------------------------------- canteen photos
 
-/** Canteen gallery photos, newest first; one canteen or all of them (home banner). */
+const CANTEEN_PHOTO_FIELDS = 'id, canteen_id, user_id, photo_path, created_at, author:profiles(full_name)'
+const toCanteenPhoto = r => ({
+  id: r.id, canteenId: r.canteen_id, userId: r.user_id, path: r.photo_path,
+  url: photoUrl(r.photo_path), by: r.author?.full_name ?? 'Student', createdAt: Date.parse(r.created_at),
+})
+
+/** Canteen gallery photos, newest first. */
 export async function fetchCanteenPhotos(canteenId, limit = 30, offset = 0) {
   need()
-  let q = supabase.from('canteen_photos')
-    .select('id, canteen_id, user_id, photo_path, created_at, author:profiles(full_name)')
+  let q = supabase.from('canteen_photos').select(CANTEEN_PHOTO_FIELDS)
     .order('created_at', { ascending: false }).order('id', { ascending: false }).range(offset, offset + limit - 1)
   if (canteenId) q = q.eq('canteen_id', canteenId)
-  return check(await q).map(r => ({
-    id: r.id, canteenId: r.canteen_id, userId: r.user_id, path: r.photo_path,
-    url: photoUrl(r.photo_path), by: r.author?.full_name ?? 'Student', createdAt: Date.parse(r.created_at),
-  }))
+  return check(await q).map(toCanteenPhoto)
 }
 
 export const CANTEEN_GALLERY_KEY = 'canteen-gallery'
 export const fetchCanteenGallery = () => fetchCanteenPhotos(null, 150)
+
+export async function fetchHomeCanteenPhotos() {
+  need()
+  // Limit the embedded gallery, so a busy canteen cannot crowd out another.
+  const rows = check(await supabase.from('canteens')
+    .select(`photos:canteen_photos!canteen_photos_canteen_id_fkey(${CANTEEN_PHOTO_FIELDS})`)
+    .order('created_at', { referencedTable: 'photos', ascending: false })
+    .order('id', { referencedTable: 'photos', ascending: false })
+    .limit(HOME_CANTEEN_PHOTO_LIMIT, { referencedTable: 'photos' }))
+  return rows.flatMap(row => row.photos.map(toCanteenPhoto))
+}
 
 export async function addCanteenPhoto(userId, canteenId, file) {
   need()

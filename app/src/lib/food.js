@@ -1,6 +1,7 @@
 // Rating and canteen maths, ported from index.html (tot, pc, sup, cSup, isOpen, hr, rtOf).
 
 export const DEFAULT_CANTEEN_HOURS = { opensAt: 6, closesAt: 21 }
+export const HOME_CANTEEN_PHOTO_LIMIT = 5
 
 export const totalRatings = f => f.superCount + f.okayCount + f.avoidCount
 export const percent = (f, key) => (totalRatings(f) ? Math.round((f[key] / totalRatings(f)) * 100) : 0)
@@ -50,6 +51,24 @@ export function withPrimaryPhoto(canteen, photos) {
   const primary = canteen.primaryPhoto
   if (!primary) return photos
   return [photos.find(photo => photo.id === primary.id) ?? primary, ...photos.filter(photo => photo.id !== primary.id)]
+}
+
+/** Each canteen's gallery is already ordered newest first by the home query. */
+export function homeCanteenSlides(canteens, photos = []) {
+  const galleries = new Map()
+  for (const photo of photos) {
+    if (!photo.url) continue
+    if (!galleries.has(photo.canteenId)) galleries.set(photo.canteenId, [])
+    const gallery = galleries.get(photo.canteenId)
+    if (gallery.length < HOME_CANTEEN_PHOTO_LIMIT) gallery.push(photo)
+  }
+
+  return [...canteens].sort(byVotes).flatMap(canteen => {
+    let recent = galleries.get(canteen.id) ?? []
+    if (recent.some(photo => photo.id === canteen.primaryPhoto?.id)) recent = withPrimaryPhoto(canteen, recent)
+    if (!recent.length && canteen.photo) recent = [{ id: canteen.id, url: canteen.photo }]
+    return recent.map(photo => ({ canteen, photo }))
+  })
 }
 
 /** Rating chip for a food: [css class, label]. No ratings yet -> neutral chip. */
