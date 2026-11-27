@@ -26,6 +26,8 @@ export default function People({ compact = false, searchOnly = false }) {
     }, compact ? 0 : 250)
     return () => { live = false; clearTimeout(timer) }
   }, [term, uid, compact, searchOnly])
+  // No filler suggestion card when the only registered account is the viewer.
+  if(compact && rows?.length===0 && !error) return null
   return <section className={'people-panel' + (compact ? ' compact' : ' card')}>
     <div className="people-heading"><h3>{compact ? 'Foodies to discover' : 'Find foodies'}</h3>{compact && <Link to="/people">See all</Link>}</div>
     {!compact && <label className="search"><Search size={20}/><input type="search" aria-label="Search students by name" placeholder="Search by name" value={term} onChange={e => setTerm(e.target.value)} /></label>}

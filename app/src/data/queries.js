@@ -1,6 +1,7 @@
 // All Supabase reads and writes outside the home summary (api.js).
 import { supabase } from '../lib/supabase'
 import { photoUrl, uploadPhoto, compressImage } from '../lib/photos'
+import { isMissingSeenSchema, queryWithSeenFallback } from '../lib/optionalSchema'
 
 const need = () => { if (!supabase) throw new Error('This needs a Supabase project. Add keys to .env.') }
 const check = ({ data, error }) => { if (error) throw error; return data }
@@ -29,14 +30,18 @@ const POST_FIELDS = 'id, user_id, canteen_id, rating, caption, photo_path, creat
 /** Latest posts, optionally for one canteen or one author, with the viewer's likes. */
 export async function fetchPosts(viewerId, { canteenId, authorId, postId, before, unseen = false, limit = 60 } = {}) {
   need()
-  let q = supabase.from('posts').select(POST_FIELDS + (viewerId && unseen ? ', seen:post_views()' : '')).order('created_at', { ascending: false }).order('id', { ascending: false }).limit(limit)
-  if (viewerId && unseen) q = q.is('seen', null)
-  if (postId) q = q.eq('id', postId)
-  if (before) q = q.or('created_at.lt.' + before.createdIso + ',and(created_at.eq.' + before.createdIso + ',id.lt.' + before.id + ')')
-  if (canteenId) q = q.eq('canteen_id', canteenId)
-  if (authorId) q = q.eq('user_id', authorId)
-  // Resolve likes only for the returned page (not an arbitrary recent-likes limit).
-  const rows = check(await q)
+  const query = includeSeen => {
+    let q = supabase.from('posts').select(POST_FIELDS + (includeSeen ? ', seen:post_views()' : '')).order('created_at', { ascending: false }).order('id', { ascending: false }).limit(limit)
+    if (includeSeen) q = q.is('seen', null)
+    if (postId) q = q.eq('id', postId)
+    if (before) q = q.or('created_at.lt.' + before.createdIso + ',and(created_at.eq.' + before.createdIso + ',id.lt.' + before.id + ')')
+    if (canteenId) q = q.eq('canteen_id', canteenId)
+    if (authorId) q = q.eq('user_id', authorId)
+    return q
+  }
+  // Keep the actual live posts readable if the seen-history migration is pending.
+  // The feed already filters locally remembered post IDs in that case.
+  const rows = check(await queryWithSeenFallback(query, !!viewerId && unseen))
   const mine = new Set(viewerId && rows.length ? check(await supabase.from('likes').select('post_id').eq('user_id', viewerId).in('post_id', rows.map(r => r.id))).map(l => l.post_id) : [])
   return rows.map(r => ({
     id: r.id,
@@ -218,7 +223,7 @@ export async function updateProfile(userId, { fullName, faculty, batch }) {
 export async function markPostSeen(postId) {
   need()
   const { error } = await supabase.from('post_views').insert({ post_id: postId })
-  if (error && error.code !== '23505') throw error
+  if (error && error.code !== '23505' && !isMissingSeenSchema(error)) throw error
 }
 
 export async function deleteOwnPost(postId, userId) {

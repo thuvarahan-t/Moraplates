@@ -73,7 +73,7 @@ export function useFeed() {
       if (run !== generation.current) return
       setPosts(rows.filter(p => !initialSeen.current.has(String(p.id))))
       setCursor(rows.at(-1) ?? null); setMore(!!supabase && rows.length === 20)
-    }).catch(e => { if (run === generation.current) { setError(e); setPosts([]) } })
+    }).catch(e => { if (run === generation.current) { console.error('Feed query failed', e.code, e.message); setError(e); setPosts([]) } })
     return () => { generation.current++ }
   }, [userId, ready, version, refreshKey])
   const markSeen = useCallback(id => {

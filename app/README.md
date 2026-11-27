@@ -69,3 +69,7 @@ With no Supabase keys the app runs on the sample data from the handoff (`src/dat
 5. Confirm storage deletion in a disposable test project and review cascade behavior before allowing production admin deletions.
 
 Database and Storage are separate systems. Deletion removes the row first, then attempts photo removal; a failed storage cleanup is reported rather than falsely claiming deletion of the file.
+
+### Production hotfix: Vercel direct links and phased migrations
+
+Vercel SPA rewrites are provided in `app/vercel.json` (recommended Vercel Root Directory: `app`) and repository-root `vercel.json` for root-based builds. A new deployment is required for these to take effect. The signed-in feed now retries its original posts query if only the optional `post_views` relationship/table is missing, preserving device-local seen history. This is not a replacement for applying the social and admin migrations. Apply only the pending new migrations, in order, on the existing project after backing up; do not reset or seed the live database.
