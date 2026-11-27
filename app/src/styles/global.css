@@ -123,6 +123,9 @@ box-shadow:0 22px 30px -14px rgba(70,20,25,.45),inset 0 -6px 10px rgba(70,20,25,
 .favb{font-size:12px;font-weight:700;background:var(--sb);color:var(--st);padding:2px 8px;border-radius:999px;margin-left:6px}
 .bar{height:8px;border-radius:99px;background:var(--chip);overflow:hidden;margin-top:4px}
 .bar i{display:block;height:100%;width:var(--w);border-radius:99px;background:var(--cc,var(--tom));animation:grow 1.1s var(--ease) backwards;animation-delay:calc(var(--i,0)*60ms + .2s)}
+.canteen-vote-share{display:flex;align-items:center;gap:8px}
+.canteen-vote-share .bar{flex:1;margin-top:0}
+.canteen-vote-share small{font-variant-numeric:tabular-nums}
 @keyframes grow{from{width:0}}
 .found{grid-column:1/-1;padding:18px;display:flex;flex-direction:column;gap:6px}
 .frow{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:10px 12px;border-radius:14px;text-decoration:none;color:var(--ink);transition:background .25s}

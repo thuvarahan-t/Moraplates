@@ -116,11 +116,19 @@ try{
   const openReports = await a.client.from('canteen_open_reports').select('canteen_id').eq('canteen_id', adminCanteen)
   assert.ok(openReports.error || openReports.data.length === 0, 'Open report rows remain private')
   check(await b.client.rpc('admin_delete',{kind:'canteens',p:{id:adminCanteen}}));adminCanteen=null
+  const voteTotals = async () => Object.fromEntries(check(await guest.from('canteen_standings')
+    .select('id, votes_this_week').in('id', ['wala', 'goda'])).map(row => [row.id, row.votes_this_week]))
+  const beforeVotes = await voteTotals()
   check(await a.client.rpc('cast_vote',{canteen:'wala'}))
+  check(await b.client.rpc('cast_vote',{canteen:'goda'}))
+  assert.deepEqual(await voteTotals(), { wala: beforeVotes.wala + 1, goda: beforeVotes.goda + 1 })
   check(await a.client.rpc('cast_vote',{canteen:'goda'}))
   assert.equal(check(await a.client.rpc('my_vote')),'goda')
+  assert.deepEqual(await voteTotals(), { wala: beforeVotes.wala, goda: beforeVotes.goda + 2 })
   check(await a.client.rpc('remove_vote'))
   assert.equal(check(await a.client.rpc('my_vote')),null)
+  check(await b.client.rpc('remove_vote'))
+  assert.deepEqual(await voteTotals(), beforeVotes)
   const deleted=check(await a.client.from('posts').delete().eq('id',post).eq('user_id',a.id).select('photo_path').single())
   assert.equal(deleted.photo_path,path)
   check(await a.client.storage.from('photos').remove([path]))
@@ -128,7 +136,7 @@ try{
   assert.equal(check(await b.client.from('posts').select('id').eq('id',post)).length,0)
   post=null;path=null
   check(await b.client.rpc('admin_delete',{kind:'foods',p:{id:food}}));food=null
-  console.log('PASS: upload, non-owner protection, seen privacy, closure and reopening, admin CRUD, vote switching, owner post and storage deletion')
+  console.log('PASS: upload, non-owner protection, seen privacy, closure and reopening, admin CRUD, weekly vote totals and switching, owner post and storage deletion')
 }finally{
   if(path)await service.storage.from('photos').remove([path])
   if(post)await service.from('posts').delete().eq('id',post)
