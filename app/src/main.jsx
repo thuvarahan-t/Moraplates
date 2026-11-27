@@ -5,8 +5,10 @@ import { router } from './router'
 import { FxProvider } from './lib/fx'
 import { AuthProvider } from './lib/auth'
 import { configError } from './lib/supabase'
+import { registerPWA } from './lib/pwa'
 import './styles/global.css'
 import './styles/mobile-social.css'
+import './styles/post-dialog.css'
 
 /** Shown instead of a blank page when the deploy's Supabase settings are wrong. */
 function ConfigError({ problem }) {
@@ -21,6 +23,8 @@ function ConfigError({ problem }) {
     </div></main>
   )
 }
+
+registerPWA()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

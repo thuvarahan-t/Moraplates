@@ -1,28 +1,25 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { fetchHome, sampleHome } from './api'
 import { useFx } from '../lib/fx'
 import { usePost } from '../lib/post'
+import { useQuery } from './useQuery'
 
 const EMPTY = { canteens: [], foods: [], platesToday: 0 }
+const SAMPLE = sampleHome()
 
 /** Sample mode resolves synchronously so the first paint matches index.html exactly. */
 export function useHomeData() {
   const { toast } = useFx()
-  const { version } = usePost()
-  const [data, setData] = useState(() => (supabase ? null : sampleHome()))
+  const { cache } = usePost()
+  const { data, loading, error } = useQuery('home', () => fetchHome(cache), {
+    enabled: !!supabase,
+    initialData: supabase ? undefined : SAMPLE,
+  })
 
   useEffect(() => {
-    if (!supabase) return
-    let live = true
-    fetchHome()
-      .then(d => live && setData(d))
-      .catch(err => {
-        console.error(err)
-        if (live) { setData(EMPTY); toast("Couldn't load canteens. Check your connection.") }
-      })
-    return () => { live = false }
-  }, [toast, version])
+    if (error) toast("Couldn't load canteens. Check your connection.")
+  }, [error, toast])
 
-  return { data: data ?? EMPTY, loading: data === null }
+  return { data: data ?? EMPTY, loading }
 }

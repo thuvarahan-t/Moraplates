@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react'
 import PostDialog from '../components/PostDialog'
+import { createQueryCache } from '../data/queryCache'
+import { useAuth } from './auth'
 
 const PostContext = createContext(null)
 
@@ -8,6 +10,9 @@ const PostContext = createContext(null)
  * goes up after every successful post so lists can reload.
  */
 export function PostProvider({ children }) {
+  const { session } = useAuth()
+  const userId = session?.user?.id
+  const cache = useMemo(() => createQueryCache(), [userId])
   const [request, setRequest] = useState(null) // { canteenId, foodId } while the dialog is open
   const [version, setVersion] = useState(0)
 
@@ -15,9 +20,12 @@ export function PostProvider({ children }) {
     setRequest({ canteenId: typeof canteenId === 'string' ? canteenId : null, foodId: foodId ?? null })
   }, [])
   const close = useCallback(() => setRequest(null), [])
-  const posted = useCallback(() => setVersion(v => v + 1), [])
+  const posted = useCallback(() => {
+    cache.invalidate()
+    setVersion(v => v + 1)
+  }, [cache])
 
-  const value = useMemo(() => ({ openPost, version, invalidate: posted }), [openPost, version, posted])
+  const value = useMemo(() => ({ cache, openPost, version, invalidate: posted }), [cache, openPost, version, posted])
   return (
     <PostContext.Provider value={value}>
       {children}

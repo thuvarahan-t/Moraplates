@@ -20,8 +20,40 @@ input,textarea,select{font-size:16px!important}
 .feed-heading,.people-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
 .feed-heading h2{font-size:clamp(24px,4vw,34px)}
 .feed-heading .mini,.people-heading .mini{display:inline-flex;align-items:center;gap:6px;min-height:44px}
+.feed-filters{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 124px;
+  gap:8px;
+  max-width:420px;
+  margin-bottom:14px;
+}
+.feed-select{position:relative;min-width:0;color:var(--brand)}
+.feed-select select{
+  display:block;
+  width:100%;
+  min-height:44px;
+  appearance:none;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:var(--card);
+  padding:0 25px 0 12px;
+  font-weight:700;
+  text-overflow:ellipsis;
+  cursor:pointer;
+}
+.feed-select .ic{
+  position:absolute;
+  inset-inline-end:8px;
+  top:50%;
+  transform:translateY(-50%);
+  pointer-events:none;
+}
+.feed-caught-up{display:flex;align-items:center;gap:12px;margin:14px 0;padding:12px 16px;border-radius:14px;background:var(--sb);color:var(--st)}
+.feed-caught-up svg{flex:none}
+.feed-caught-up h3{font-size:16px}
+.feed-caught-up p{font-size:14px}
 .today{margin-bottom:20px}
-.today h1{font-size:clamp(27px,4vw,39px)}
+.today h1{font-size:clamp(27px,4vw,39px);overflow-wrap:anywhere}
 .social-post{overflow:hidden;max-width:100%;background:#fff}
 .social-post .pb{padding:12px 16px;gap:8px}
 .social-post .ph{min-height:44px}
@@ -61,10 +93,34 @@ input,textarea,select{font-size:16px!important}
 .canteen-list-item .ccard{flex:1;min-width:0}
 .canteen-share{margin-right:8px}
 .closure-box{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px;background:var(--chip);border-radius:14px;margin-top:12px}
-.closure-box>div{flex:1 1 150px}
+.closure-copy{flex:1 1 150px}
 .closure-box b,.closure-box small{display:block}
 .closure-box small{font-size:12px;color:var(--mut)}
-.closure-box .mini{min-height:40px}
+.closure-actions{display:flex;flex-wrap:wrap;gap:8px}
+.closure-inline-options{display:none}
+.closure-dialog{
+  position:fixed;
+  inset:0;
+  width:min(440px,calc(100% - 32px));
+  max-height:calc(100dvh - 32px);
+  margin:auto;
+  padding:0;
+  border:1px solid var(--line);
+  border-radius:20px;
+  background:var(--card);
+  color:var(--ink);
+  box-shadow:0 18px 52px #291c1933;
+  overscroll-behavior:contain;
+}
+.closure-dialog::backdrop{
+  background:rgba(41,28,25,.36);
+  -webkit-backdrop-filter:blur(6px);
+  backdrop-filter:blur(6px);
+}
+.closure-dialog-panel{display:grid;gap:12px;padding:18px 20px 20px}
+.closure-dialog-header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.closure-dialog-header h2{font-size:25px;color:var(--brand)}
+.closure-dialog-description{color:var(--mut);font-size:14px}
 .vote-meter{display:block;height:5px;background:#e8dfd4;border-radius:99px;overflow:hidden;margin-top:6px}
 .vote-meter i{display:block;height:100%;border-radius:inherit;background:var(--leaf);transition:width .25s ease}
 .vrow{min-height:76px}
@@ -81,7 +137,10 @@ input,textarea,select{font-size:16px!important}
 .admin-actions{display:flex;flex:none}
 .danger{color:#a33220}
 @media(max-width:760px){
-  .band{padding:16px 12px 24px}
+  .closure-dialog-trigger{display:none}
+  .closure-inline-options{display:contents}
+  .band{--band-gutter:12px;padding:16px var(--band-gutter) 24px}
+  .band .chips.scroll{margin-inline:calc(-1 * var(--band-gutter));padding-inline:var(--band-gutter)}
   main{padding-bottom:calc(86px + env(safe-area-inset-bottom,0px))}
   .hw{padding:8px 14px}
   .social-layout{display:block}
@@ -101,8 +160,6 @@ input,textarea,select{font-size:16px!important}
   #feed .posts{gap:12px}
   .bnav{background:#fff;backdrop-filter:none;bottom:calc(8px + env(safe-area-inset-bottom,0px));box-shadow:0 4px 20px #6b1e2a25;border:1px solid var(--line)}
   .bnav::before{display:none}
-  .bnav .plus{width:46px;height:46px;box-shadow:none}
-  .bnav a{min-height:48px}
   .canteen-list-item .ccard{padding:12px;gap:10px}
   .canteen-list-item .cthumb{max-width:78px}
   .canteen-share{margin-right:2px}

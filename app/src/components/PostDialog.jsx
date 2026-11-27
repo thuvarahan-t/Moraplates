@@ -8,9 +8,9 @@ import { SAMPLE_CANTEENS, SAMPLE_FOODS } from '../data/sample'
 import { CameraIcon, CloseIcon } from './icons'
 import Dropdown from './Dropdown'
 import CropPhoto from './CropPhoto'
+import StarRating, { starsToRating } from './StarRating'
 
 const NEW = '__new'
-const RATINGS = [['super', 's', 'Super', 'Would eat again'], ['okay', 'o', 'Okay', "It's fine"], ['avoid', 'a', 'Avoid', 'Skip it']]
 
 async function loadMenu() {
   if (!supabase) return { canteens: SAMPLE_CANTEENS, foods: SAMPLE_FOODS }
@@ -32,6 +32,7 @@ function friendly(e) {
 export default function PostDialog({ request, onClose, onPosted }) {
   const dlg = useRef(null)
   const submitBtn = useRef(null)
+  const nameInput = useRef(null)
   const navigate = useNavigate()
   const { session } = useAuth()
   const { toast, confetti } = useFx()
@@ -39,9 +40,10 @@ export default function PostDialog({ request, onClose, onPosted }) {
   const [menu, setMenu] = useState(null)
   const [canteenId, setCanteenId] = useState(request.canteenId)
   const [foodId, setFoodId] = useState(request.foodId)
+  const [openFood, setOpenFood] = useState(0)
   const [newName, setNewName] = useState('')
   const [newPrice, setNewPrice] = useState('')
-  const [rating, setRating] = useState('super')
+  const [stars, setStars] = useState(0)
   const [caption, setCaption] = useState('')
   const [photo, setPhoto] = useState(null)
   const [cropFile, setCropFile] = useState(null)
@@ -64,12 +66,13 @@ export default function PostDialog({ request, onClose, onPosted }) {
     loadMenu().then(setMenu).catch(e => { console.error(e); setErr("Couldn't load the menu. Check your connection.") })
   }, [needsSignIn])
 
-  // Default to the first canteen, and to its first food (or "add new" when it has none).
-  const cid = canteenId ?? menu?.canteens[0]?.id
+  // Only foods from the chosen canteen. Nothing is pre-picked unless the dialog was opened from a canteen or dish.
+  const cid = menu?.canteens.some(c => c.id === canteenId) ? canteenId : null
   const foods = menu?.foods.filter(f => f.canteenId === cid) ?? []
-  const fid = foodId && (foodId === NEW || foods.some(f => f.id === foodId)) ? foodId : foods[0]?.id ?? NEW
+  const fid = foodId === NEW || foods.some(f => f.id === foodId) ? foodId : null
 
   useEffect(() => () => preview && URL.revokeObjectURL(preview), [preview])
+  useEffect(() => { if (fid === NEW) nameInput.current?.focus({ preventScroll: false }) }, [fid])
 
   if (needsSignIn) return null
 
@@ -84,13 +87,15 @@ export default function PostDialog({ request, onClose, onPosted }) {
   const submit = async e => {
     e.preventDefault()
     if (busy || cropFile) return
-    if (!cid) return setErr('Choose a canteen.')
     if (!photo) return setErr('Add a photo of your plate.')
+    if (!cid) return setErr('Choose the canteen.')
+    if (!fid) return setErr('Choose what you ate, or add it.')
     const price = Math.round(+newPrice)
     if (fid === NEW) {
       if (!newName.trim()) return setErr('Enter the food name.')
       if (!(price > 0 && price <= 5000)) return setErr('Enter a price between Rs 1 and Rs 5000.')
     }
+    if (!stars) return setErr('Give it 1 to 5 stars.')
     if (!supabase) return setErr('Posting needs a Supabase project. Add keys to .env.')
 
     setBusy(true)
@@ -104,7 +109,7 @@ export default function PostDialog({ request, onClose, onPosted }) {
         foodRow = data.id
       }
       uploadedPath = await uploadPhoto(session.user.id, photo)
-      const { error } = await supabase.from('posts').insert({ canteen_id: cid, food_id: foodRow, rating, caption: caption.trim(), photo_path: uploadedPath })
+      const { error } = await supabase.from('posts').insert({ canteen_id: cid, food_id: foodRow, rating: starsToRating(stars), caption: caption.trim(), photo_path: uploadedPath })
       if (error) throw error
       uploadedPath = null
 
@@ -123,8 +128,10 @@ export default function PostDialog({ request, onClose, onPosted }) {
     }
   }
 
+  const canteen = menu?.canteens.find(c => c.id === cid)
+
   return (
-    <dialog id="dlg" ref={dlg} aria-labelledby="dlgT" onClose={onClose} onCancel={e=>{if(busy)e.preventDefault()}} onClick={e => !busy && e.target === dlg.current && dlg.current.close()}>
+    <dialog id="dlg" className="pd" ref={dlg} aria-labelledby="dlgT" onClose={onClose} onCancel={e=>{if(busy)e.preventDefault()}} onClick={e => !busy && e.target === dlg.current && dlg.current.close()}>
       <form id="pf" noValidate onSubmit={submit}>
         <div className="dh">
           <h2 id="dlgT">Post your plate</h2>
@@ -133,58 +140,65 @@ export default function PostDialog({ request, onClose, onPosted }) {
           </button>
         </div>
 
-        {cropFile ? <CropPhoto file={cropFile} onCancel={()=>setCropFile(null)} onDone={f=>{setPhoto(f);setPreview(URL.createObjectURL(f));setCropFile(null)}}/> : <label className="pick">
-          {preview ? <><img src={preview} alt="Your plate" /><span className="chg">Change photo</span></> : <><CameraIcon /><span>Add a photo of your plate</span></>}
-          <input type="file" accept="image/*" onChange={pickPhoto} disabled={busy} aria-label="Photo of your plate" />
-        </label>}
-
-        <div className="fl">
-          <span id="pf-canteen">Where did you eat?</span>
-          <Dropdown
-            labelId="pf-canteen" value={cid} disabled={!menu}
-            placeholder={err ? 'Canteens unavailable' : 'Loading canteens…'}
-            options={(menu?.canteens ?? []).map(c => ({ value: c.id, label: c.name, sub: c.location, dot: c.colour }))}
-            onChange={v => { setCanteenId(v); setFoodId(null); setErr('') }}
-          />
-        </div>
-
-        <div className="fl">
-          <span id="pf-food">What did you eat?</span>
-          <Dropdown
-            labelId="pf-food" value={fid} disabled={!menu}
-            options={[
-              ...foods.map(f => ({ value: f.id, label: f.name, sub: 'Rs ' + f.price })),
-              { value: NEW, label: '+ Add a new food', sub: foods.length ? 'Not on the list? Add it' : 'No foods here yet. Add the first one' },
-            ]}
-            onChange={v => { setFoodId(v); setErr('') }}
-          />
-        </div>
-        {fid === NEW && (
-          <div className="newf">
-            <label className="fl"><span>Food name</span><input maxLength={40} placeholder="Cheese kottu" value={newName} onChange={e => { setNewName(e.target.value); setErr('') }} /></label>
-            <label className="fl"><span>Price (Rs)</span><input type="number" min="1" max="5000" inputMode="numeric" placeholder="450" value={newPrice} onChange={e => { setNewPrice(e.target.value); setErr('') }} /></label>
-          </div>
-        )}
-
-        <fieldset>
-          <legend>How was it?</legend>
-          <div className="seg rate">
-            {RATINGS.map(([v, cls, label, sub]) => (
-              <label key={v} className={cls}>
-                <input type="radio" name="pr" value={v} checked={rating === v} onChange={() => setRating(v)} />
-                <span>{label}<small>{sub}</small></span>
+        <div className="pf-body">
+          {cropFile ? <CropPhoto file={cropFile} onCancel={()=>setCropFile(null)} onDone={f=>{setPhoto(f);setPreview(URL.createObjectURL(f));setCropFile(null)}}/> : (
+            <div className="pf-top">
+              <label className={'pick pf-photo' + (preview ? ' has' : '')}>
+                {preview ? <><img src={preview} alt="Your plate" /><span className="chg">Change</span></> : <><CameraIcon /><span>Add photo</span></>}
+                <input type="file" accept="image/*" onChange={pickPhoto} disabled={busy} aria-label="Photo of your plate" />
               </label>
-            ))}
-          </div>
-        </fieldset>
+              <div className="pf-where">
+                <div className="fl">
+                  <span id="pf-canteen">Canteen</span>
+                  <Dropdown
+                    labelId="pf-canteen" value={cid} disabled={!menu || busy} searchable
+                    placeholder={!menu ? (err ? 'Unavailable' : 'Loading…') : 'Where did you eat?'}
+                    searchPlaceholder="Search canteens" emptyText="No canteen by that name"
+                    options={(menu?.canteens ?? []).map(c => ({ value: c.id, label: c.name, sub: c.location, dot: c.colour }))}
+                    onChange={v => { setCanteenId(v); setFoodId(null); setErr(''); setOpenFood(n => n + 1) }}
+                  />
+                </div>
+                <div className="fl">
+                  <span id="pf-food">Food</span>
+                  <Dropdown
+                    labelId="pf-food" value={fid} disabled={!cid || busy} searchable openSignal={openFood}
+                    placeholder={cid ? 'What did you eat?' : 'Pick a canteen first'}
+                    searchPlaceholder={`Search ${canteen?.name ?? ''} menu`} emptyText="Not on this menu yet"
+                    options={[
+                      ...foods.map(f => ({ value: f.id, label: f.name, sub: 'Rs ' + f.price })),
+                      ...(fid === NEW ? [{ value: NEW, label: newName.trim() || 'New food', sub: 'Adding to the menu' }] : []),
+                    ]}
+                    action={{
+                      label: q => (q ? `+ Add “${q}”` : '+ Add a new food'),
+                      sub: foods.length ? 'Not on the list? Add it to the menu' : 'No foods here yet. Add the first one',
+                      onPick: q => { setFoodId(NEW); if (q) setNewName(q); setErr('') },
+                    }}
+                    onChange={v => { setFoodId(v); setErr('') }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
-        <label className="fl">
-          <span>Say something <em>{caption.length}/160</em></span>
-          <textarea maxLength={160} rows={3} placeholder="Spicy? Cold? Worth the queue?" value={caption} onChange={e => setCaption(e.target.value)} />
-        </label>
+          {fid === NEW && !cropFile && (
+            <div className="newf pf-new">
+              <label className="fl"><span>New food name</span><input ref={nameInput} maxLength={40} placeholder="Cheese kottu" value={newName} onChange={e => { setNewName(e.target.value); setErr('') }} /></label>
+              <label className="fl pf-price"><span>Price (Rs)</span><input type="number" min="1" max="5000" inputMode="numeric" placeholder="450" value={newPrice} onChange={e => { setNewPrice(e.target.value); setErr('') }} /></label>
+            </div>
+          )}
 
-        <p className="err" role="alert">{err}</p>
-        <button className="btn wide" type="submit" ref={submitBtn} disabled={busy || !menu || !!cropFile}>{busy ? 'Posting…' : 'Post to feed'}</button>
+          <StarRating value={stars} onChange={n => { setStars(n); setErr('') }} disabled={busy} />
+
+          <label className="fl pf-say">
+            <span>Say something <em>{caption.length}/160</em></span>
+            <textarea maxLength={160} rows={2} placeholder="Spicy? Cold? Worth the queue?" value={caption} onChange={e => setCaption(e.target.value)} />
+          </label>
+        </div>
+
+        <div className="pf-foot">
+          {err && <p className="err" role="alert">{err}</p>}
+          <button className="btn wide" type="submit" ref={submitBtn} disabled={busy || !menu || !!cropFile}>{busy ? 'Posting…' : 'Post to feed'}</button>
+        </div>
       </form>
     </dialog>
   )

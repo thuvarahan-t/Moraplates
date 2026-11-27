@@ -3,14 +3,16 @@ import { useAuth } from '../lib/auth'
 import { Link } from './NavLinks'
 import Avatar from './Avatar'
 import { useFx } from '../lib/fx'
+import { usePost } from '../lib/post'
 import { useSignInGate } from '../lib/useSignInGate'
-import { addComment, deleteComment, fetchComments, friendly } from '../data/queries'
+import { addComment, deleteComment, fetchComments, friendly, POST_READS } from '../data/queries'
 import { timeAgo } from '../lib/format'
 
 /** Comment thread under a post. Loads when opened. `onCount` reports +1 / -1 changes. */
 export default function Comments({ postId, onCount }) {
   const { session } = useAuth()
   const { toast } = useFx()
+  const { cache } = usePost()
   const gate = useSignInGate()
   const [list, setList] = useState(null)
   const [text, setText] = useState('')
@@ -27,6 +29,7 @@ export default function Comments({ postId, onCount }) {
     setBusy(true)
     try {
       await addComment(postId, body)
+      cache.invalidate(...POST_READS)
       setText('')
       onCount(1)
       await load()
@@ -40,6 +43,7 @@ export default function Comments({ postId, onCount }) {
   const remove = async id => {
     try {
       await deleteComment(id)
+      cache.invalidate(...POST_READS)
       onCount(-1)
       setList(l => l.filter(c => c.id !== id))
     } catch (err) {

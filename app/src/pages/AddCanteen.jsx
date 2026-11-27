@@ -7,7 +7,8 @@ import { BackIcon, CameraIcon, PinIcon } from '../components/icons'
 import { addCanteen, friendly } from '../data/queries'
 import { useAuth } from '../lib/auth'
 import { centreOf, useFx } from '../lib/fx'
-import { hourLabel } from '../lib/food'
+import { DEFAULT_CANTEEN_HOURS, hourLabel } from '../lib/food'
+import { usePost } from '../lib/post'
 import { useSignInGate } from '../lib/useSignInGate'
 
 const HOURS = Array.from({ length: 25 }, (_, h) => h)
@@ -17,9 +18,10 @@ export default function AddCanteen() {
   const { session, ready } = useAuth()
   const gate = useSignInGate()
   const navigate = useNavigate()
+  const { invalidate } = usePost()
   const { toast, confetti } = useFx()
 
-  const [f, setF] = useState({ name: '', location: '', knownFor: '', opensAt: 7, closesAt: 18 })
+  const [f, setF] = useState({ name: '', location: '', knownFor: '', ...DEFAULT_CANTEEN_HOURS })
   const [spot, setSpot] = useState(null)
   const [photo, setPhoto] = useState(null)
   const [cropFile, setCropFile] = useState(null)
@@ -44,10 +46,12 @@ export default function AddCanteen() {
     if (f.closesAt <= f.opensAt) return setErr('Closing time must be after opening time.')
     if (!spot) return setErr('Tap the map to drop a pin where the canteen is.')
     if (!gate('to add a canteen')) return
+    const submitter = e.nativeEvent.submitter ?? e.currentTarget
     setBusy(true)
     try {
       const {id,photoError} = await addCanteen(session.user.id, { ...f, name: f.name.trim(), location: f.location.trim(), knownFor: f.knownFor.trim(), lat: spot.lat, lng: spot.lng, photo })
-      const [x, y] = centreOf(e.nativeEvent.submitter ?? e.currentTarget)
+      invalidate()
+      const [x, y] = centreOf(submitter)
       confetti(x, y, 26)
       toast(photoError?'Canteen added; please retry its photo on the canteen page.':f.name.trim() + ' added. Now add its foods.')
       navigate(`/canteens/${id}`)

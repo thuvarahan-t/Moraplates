@@ -1,5 +1,7 @@
 // Rating and canteen maths, ported from index.html (tot, pc, sup, cSup, isOpen, hr, rtOf).
 
+export const DEFAULT_CANTEEN_HOURS = { opensAt: 6, closesAt: 21 }
+
 export const totalRatings = f => f.superCount + f.okayCount + f.avoidCount
 export const percent = (f, key) => (totalRatings(f) ? Math.round((f[key] / totalRatings(f)) * 100) : 0)
 export const superPercent = f => percent(f, 'superCount')

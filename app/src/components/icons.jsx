@@ -1,8 +1,8 @@
 // App icons, all from Lucide (https://lucide.dev) so strokes, corners and sizes match.
 import {
-  ArrowLeft, Camera, Check, ChefHat, ChevronDown, ChevronRight, Clock, Crown, Flame, Heart, LocateFixed, Lock, LogOut,
+  ArrowLeft, Camera, Check, ChefHat, ChevronDown, ChevronRight, Clock, Crown, Eye, EyeOff, Flame, Heart, LocateFixed, Lock, LogOut,
   Mail, MapPin, Map as MapLucide, MessageCircle, Pencil, Plus, Search, Sparkles, Store, Trophy, UserRound,
-  Trash2, Utensils, X,
+  Trash2, Utensils, X, Download, Share, SquarePlus, RefreshCw,
 } from 'lucide-react'
 
 const icon = (Cmp, defaults = {}) => {
@@ -35,9 +35,15 @@ export const FeedIcon = icon(Utensils, { size: 24 })
 export const StoreIcon = icon(Store, { size: 24 })
 export const CloseIcon = icon(X)
 export const LockIcon = icon(Lock)
+export const EyeIcon = icon(Eye)
+export const EyeOffIcon = icon(EyeOff)
 export const CrownIcon = icon(Crown, { size: 34 })
 export const LogOutIcon = icon(LogOut, { size: 18 })
 export const TrashIcon = icon(Trash2, { size: 18 })
 export const PencilIcon = icon(Pencil, { size: 16 })
 export const ChefHatIcon = icon(ChefHat, { size: 18 })
 export const ForkKnifeIcon = icon(Utensils, { size: 18 })
+export const DownloadIcon = icon(Download, { size: 18 })
+export const ShareIcon = icon(Share, { size: 16 })
+export const AddSquareIcon = icon(SquarePlus, { size: 16 })
+export const RefreshIcon = icon(RefreshCw, { size: 18 })

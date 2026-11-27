@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { Navigate } from 'react-router'
 import { Link } from '../components/NavLinks'
 import PlateScene from '../components/PlateScene'
-import { CameraIcon, ChefHatIcon, ForkKnifeIcon, SparkIcon, TrophyIcon } from '../components/icons'
+import { CameraIcon, ChefHatIcon, EyeIcon, EyeOffIcon, ForkKnifeIcon, SparkIcon, TrophyIcon } from '../components/icons'
 import { useAuth } from '../lib/auth'
 import { useFx } from '../lib/fx'
 import { ALLOWED_EMAIL_DOMAIN } from '../lib/supabase'
@@ -27,6 +27,7 @@ export default function Welcome() {
   const [name, setName] = useState('')
   const [user, setUser] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const tabRefs = useRef({})
@@ -40,6 +41,7 @@ export default function Welcome() {
     if (m === mode) return
     setFrom(m === 'up' ? 'right' : 'left')
     setMode(m)
+    setShowPassword(false)
     setErr('')
     if (focus) tabRefs.current[m]?.focus()
   }
@@ -111,11 +113,18 @@ export default function Welcome() {
                 <span aria-hidden="true">@{ALLOWED_EMAIL_DOMAIN}</span>
               </span>
             </label>
-            <label className="fl">
-              <span>Password {up && <em>at least 6 characters</em>}</span>
-              <input type="password" autoComplete={up ? 'new-password' : 'current-password'} value={password}
-                onChange={e => { setPassword(e.target.value); setErr('') }} />
-            </label>
+            <div className="fl">
+              <label htmlFor="auth-password">Password {up && <em>at least 6 characters</em>}</label>
+              <div className="password-field">
+                <input id="auth-password" type={showPassword ? 'text' : 'password'}
+                  autoComplete={up ? 'new-password' : 'current-password'} autoCapitalize="none" spellCheck={false} value={password}
+                  onChange={e => { setPassword(e.target.value); setErr('') }} />
+                <button type="button" aria-controls="auth-password" aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  onClick={() => setShowPassword(visible => !visible)}>
+                  {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+                </button>
+              </div>
+            </div>
 
             <p className="err" role="alert">{err}</p>
             <button className="btn wide" type="submit" disabled={busy}>

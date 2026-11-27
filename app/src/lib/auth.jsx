@@ -29,7 +29,7 @@ function authMessage(e) {
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
-  const [profile, setProfile] = useState(supabase ? null : SAMPLE_ME)
+  const [loadedProfile, setProfile] = useState(supabase ? null : SAMPLE_ME)
   const [ready, setReady] = useState(!supabase)
   const [tick, setTick] = useState(0)
 
@@ -44,6 +44,7 @@ export function AuthProvider({ children }) {
   }, [])
 
   const userId = session?.user?.id
+  const profile = supabase && loadedProfile?.id !== userId ? null : loadedProfile
   useEffect(() => {
     if (!supabase) return
     if (!userId) { setProfile(null); return }

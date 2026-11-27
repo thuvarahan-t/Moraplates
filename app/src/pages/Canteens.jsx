@@ -10,7 +10,7 @@ import Loader from '../components/Loader'
 import { LocationIcon, MapIcon, PlusIcon, SearchIcon } from '../components/icons'
 import { useHomeData } from '../data/useHomeData'
 import { useQuery } from '../data/useQuery'
-import { fetchCanteenPhotos } from '../data/queries'
+import { CANTEEN_GALLERY_KEY, fetchCanteenGallery } from '../data/queries'
 import { supabase } from '../lib/supabase'
 import { byVotes, hourLabel, isOpen, isReportedClosed, ratingChip, superPercent } from '../lib/food'
 import { useSignInGate } from '../lib/useSignInGate'
@@ -31,7 +31,7 @@ export default function Canteens() {
   const [sort, setSort] = useState('votes')
   const [quiet, setQuiet] = useState(false) // typing re-renders without replaying the rise animation
   const [showMap, setShowMap] = useState(false)
-  const { data: photos } = useQuery(() => (supabase ? fetchCanteenPhotos(null, 150) : Promise.resolve([])), [])
+  const { data: photos } = useQuery(CANTEEN_GALLERY_KEY, fetchCanteenGallery, { enabled: !!supabase })
   const thumbs = firstPhotoByCanteen(photos)
 
   const max = Math.max(1, ...canteens.map(c => c.votes))

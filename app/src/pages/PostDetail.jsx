@@ -7,15 +7,16 @@ import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
 import { fetchPosts } from '../data/queries'
 import { useQuery } from '../data/useQuery'
+import { queryKey } from '../data/queryCache'
 import { samplePosts, useLikeToggle } from '../data/feed'
 import { useHomeData } from '../data/useHomeData'
 export default function PostDetail() {
   const { id } = useParams()
   const { session } = useAuth()
   const uid = session?.user?.id
-  const { data, loading, error, reload } = useQuery(() => supabase ? fetchPosts(uid,{postId:id,limit:1}) : Promise.resolve(samplePosts().filter(p => p.id === id)),[id,uid])
+  const { data, loading, error, reload } = useQuery(queryKey('post', id), () => supabase ? fetchPosts(uid,{postId:id,limit:1}) : Promise.resolve(samplePosts().filter(p => p.id === id)))
   const { data: home } = useHomeData()
-  const [posts,setPosts] = useState([])
+  const [posts,setPosts] = useState(() => data ?? [])
   const ref = useRef(posts); ref.current = posts
   useEffect(() => setPosts(data || []),[data])
   const like = useLikeToggle(ref,setPosts)

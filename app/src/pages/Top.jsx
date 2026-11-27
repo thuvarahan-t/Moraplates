@@ -12,17 +12,20 @@ import VotesChart from '../components/VotesChart'
 import { plural } from '../lib/format'
 import { superPercent, totalRatings } from '../lib/food'
 import { centreOf, useFx } from '../lib/fx'
+import { usePost } from '../lib/post'
 import { useSignInGate } from '../lib/useSignInGate'
 import { useQuery } from '../data/useQuery'
 import { castVote, fetchTop, friendly, removeVote } from '../data/queries'
 
 const MIN_RATINGS = 3 // a dish needs this many ratings to rank
+const SAMPLE_TOP = { canteens: [...SAMPLE_CANTEENS].sort((a, b) => b.votes - a.votes), foods: SAMPLE_FOODS, foodies: [], myVote: null, photos: [] }
 
 /** Podium, top dishes, top foodies (renderTop() in index.html). */
 export default function Top() {
   const { session } = useAuth()
+  const { cache, invalidate } = usePost()
   const uid = session?.user?.id
-  const { data, error, reload } = useQuery(() => supabase ? fetchTop(uid) : Promise.resolve({canteens:[...SAMPLE_CANTEENS].sort((a,b)=>b.votes-a.votes),foods:SAMPLE_FOODS,foodies:[],myVote:null,photos:[]}), [uid])
+  const { data, error } = useQuery('top', () => fetchTop(uid, cache), { enabled: !!supabase, initialData: supabase ? undefined : SAMPLE_TOP })
   const canteens = data?.canteens ?? []
   const dishes = (data?.foods ?? []).filter(f => totalRatings(f) >= MIN_RATINGS)
     .sort((a, b) => superPercent(b) - superPercent(a) || totalRatings(b) - totalRatings(a)).slice(0, 5)
@@ -37,7 +40,7 @@ export default function Top() {
       {error && <div className="card empty"><h3>Couldn't load the rankings</h3><p>Check your connection and try again.</p></div>}
       {!data && !error && <Loader label="Loading rankings" />}
       {data && <VotesChart canteens={canteens} />}
-      {data && <VoteBoard canteens={canteens} myVote={data.myVote} photos={data.photos} onVoted={reload} />}
+      {data && <VoteBoard canteens={canteens} myVote={data.myVote} photos={data.photos} onVoted={invalidate} />}
 
       {data && <>
       <div className="podium">

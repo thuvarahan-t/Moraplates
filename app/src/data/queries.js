@@ -2,6 +2,7 @@
 import { supabase } from '../lib/supabase'
 import { photoUrl, uploadPhoto, compressImage } from '../lib/photos'
 import { isMissingSeenSchema, queryWithSeenFallback } from '../lib/optionalSchema'
+import { byVotes } from '../lib/food'
 
 const need = () => { if (!supabase) throw new Error('This needs a Supabase project. Add keys to .env.') }
 const check = ({ data, error }) => { if (error) throw error; return data }
@@ -16,6 +17,14 @@ export const toFood = r => ({
   superCount: r.super_count ?? 0, okayCount: r.okay_count ?? 0, avoidCount: r.avoid_count ?? 0,
 })
 
+export async function fetchCanteenStandings() {
+  return check(await supabase.from('canteen_standings').select('*')).map(toCanteen)
+}
+
+export async function fetchFoodStats() {
+  return check(await supabase.from('food_stats').select('*')).map(toFood)
+}
+
 /** Turns Supabase errors into something a student can act on. */
 export function friendly(e) {
   if (e?.code === '42501' || /row-level security/i.test(e?.message ?? '')) return 'Only signed-in @uom.lk accounts can do that.'
@@ -26,6 +35,7 @@ export function friendly(e) {
 // ---------------------------------------------------------------- posts
 
 const POST_FIELDS = 'id, user_id, canteen_id, rating, caption, photo_path, created_at, author:profiles!posts_user_id_fkey(full_name, faculty, avatar_path), food:foods(name, price), likes(count), comments(count)'
+export const POST_READS = ['feed', 'own-profile', 'public-profile', 'post', 'canteen']
 
 /** Latest posts, optionally for one canteen or one author, with the viewer's likes. */
 export async function fetchPosts(viewerId, { canteenId, authorId, postId, before, unseen = false, limit = 60 } = {}) {
@@ -146,6 +156,9 @@ export async function fetchCanteenPhotos(canteenId, limit = 30) {
   }))
 }
 
+export const CANTEEN_GALLERY_KEY = 'canteen-gallery'
+export const fetchCanteenGallery = () => fetchCanteenPhotos(null, 150)
+
 export async function addCanteenPhoto(userId, canteenId, file) {
   need()
   const path = await uploadPhoto(userId, await compressImage(file))
@@ -165,27 +178,30 @@ export async function deleteCanteenPhoto(photo) {
 
 // ---------------------------------------------------------------- top + profile
 
-export async function fetchTop(viewerId) {
-  need()
-  const [c, f, p, vote, photos] = await Promise.all([
-    supabase.from('canteen_standings').select('*').order('votes_this_week', { ascending: false }),
-    supabase.from('food_stats').select('*'),
-    supabase.from('profile_stats').select('user_id, full_name, avatar_path, plates').gt('plates', 0).order('plates', { ascending: false }).limit(4),
-    viewerId ? supabase.rpc('my_vote') : Promise.resolve({ data: null }),
-    fetchCanteenPhotos(null, 150),
-  ])
-  return { canteens: check(c).map(toCanteen), foods: check(f).map(toFood), foodies: check(p).map(r => ({ ...r, avatar: photoUrl(r.avatar_path) })), myVote: check(vote), photos }
+async function fetchMyVote() {
+  return check(await supabase.rpc('my_vote'))
 }
 
-export async function fetchProfilePage(userId) {
+export async function fetchTop(viewerId, cache) {
+  need()
+  const [c, f, p, vote, photos] = await Promise.all([
+    cache.load('canteen-standings', fetchCanteenStandings),
+    cache.load('food-stats', fetchFoodStats),
+    supabase.from('profile_stats').select('user_id, full_name, avatar_path, plates').gt('plates', 0).order('plates', { ascending: false }).limit(4),
+    viewerId ? cache.load('my-vote', fetchMyVote) : null,
+    cache.load(CANTEEN_GALLERY_KEY, fetchCanteenGallery),
+  ])
+  return { canteens: [...c].sort(byVotes), foods: f, foodies: check(p).map(r => ({ ...r, avatar: photoUrl(r.avatar_path) })), myVote: vote, photos }
+}
+
+export async function fetchProfilePage(userId, cache) {
   need()
   const [stats, posts, vote] = await Promise.all([
     supabase.from('profile_stats').select('*').eq('user_id', userId).maybeSingle(),
     fetchPosts(userId, { authorId: userId, limit: 60 }),
-    supabase.rpc('my_vote'),
+    cache.load('my-vote', fetchMyVote),
   ])
-  const fav = check(vote)
-  const favCanteen = fav ? check(await supabase.from('canteens').select('id, name').eq('id', fav).maybeSingle()) : null
+  const favCanteen = vote ? check(await supabase.from('canteens').select('id, name').eq('id', vote).maybeSingle()) : null
   return { stats: check(stats), posts, favCanteen }
 }
 
@@ -242,6 +258,17 @@ export async function fetchPeople(term = '', excludeId, limit = 12) {
   if (clean) q = q.ilike('full_name', '%' + clean + '%')
   return check(await q).map(r => ({ id:r.id, name:r.full_name, faculty:r.faculty, batch:r.batch, avatar:photoUrl(r.avatar_path) }))
 }
-export async function reportClosed(id, withdraw = false) {
-  need(); check(await supabase.rpc(withdraw ? 'withdraw_canteen_closed' : 'report_canteen_closed', { canteen: id }))
+const CLOSURE_RPC = {
+  hour: 'report_canteen_closed',
+  today: 'report_canteen_closed_today',
+  withdraw: 'withdraw_canteen_closed',
+}
+
+export async function reportClosed(id, action) {
+  need()
+  const result = await supabase.rpc(CLOSURE_RPC[action], { canteen: id })
+  if (action === 'today' && result.error?.code === 'PGRST202') {
+    throw new Error('Full-day closure reports are unavailable right now.')
+  }
+  check(result)
 }

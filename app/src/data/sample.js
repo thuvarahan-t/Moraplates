@@ -1,13 +1,15 @@
 // Sample content copied from moraplates-handoff/website/index.html.
 // Used when no Supabase project is configured. All of it is placeholder data.
 
+import { DEFAULT_CANTEEN_HOURS } from '../lib/food.js'
+
 export const SAMPLE_CANTEENS = [
-  { id: 'it', name: 'IT canteen', location: 'Near the IT faculty', opensAt: 7, closesAt: 19, knownFor: 'Chicken kottu', votes: 312, colour: '#E8492F' },
-  { id: 'main', name: 'Main canteen', location: 'Beside the library', opensAt: 7, closesAt: 16, knownFor: 'Rice and curry', votes: 268, colour: '#E09A12' },
-  { id: 'civil', name: 'Civil canteen', location: 'Civil faculty block', opensAt: 7, closesAt: 17, knownFor: 'String hoppers', votes: 190, colour: '#2F9E5B' },
-  { id: 'juice', name: 'Juice bar', location: 'Near the ground', opensAt: 9, closesAt: 18, knownFor: 'Faluda', votes: 145, colour: '#D4537E' },
-  { id: 'hostel', name: 'Hostel canteen', location: 'Inside the hostel premises', opensAt: 6, closesAt: 22, knownFor: 'Egg roti', votes: 98, colour: '#7F77DD' },
-]
+  { id: 'it', name: 'IT canteen', location: 'Near the IT faculty', knownFor: 'Chicken kottu', votes: 312, colour: '#E8492F' },
+  { id: 'main', name: 'Main canteen', location: 'Beside the library', knownFor: 'Rice and curry', votes: 268, colour: '#E09A12' },
+  { id: 'civil', name: 'Civil canteen', location: 'Civil faculty block', knownFor: 'String hoppers', votes: 190, colour: '#2F9E5B' },
+  { id: 'juice', name: 'Juice bar', location: 'Near the ground', knownFor: 'Faluda', votes: 145, colour: '#D4537E' },
+  { id: 'hostel', name: 'Hostel canteen', location: 'Inside the hostel premises', knownFor: 'Egg roti', votes: 98, colour: '#7F77DD' },
+].map(canteen => ({ ...DEFAULT_CANTEEN_HOURS, ...canteen }))
 
 export const SAMPLE_FOODS = [
   ['kottu', 'it', 'Chicken kottu', 450, 114, 8, 2], ['ckottu', 'it', 'Cheese kottu', 550, 53, 6, 2],

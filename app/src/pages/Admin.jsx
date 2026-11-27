@@ -7,6 +7,7 @@ import {usePost} from '../lib/post'
 import {adminList,adminSave,adminDelete} from '../data/admin'
 import Loader from '../components/Loader'
 import {photoUrl} from '../lib/photos'
+import {DEFAULT_CANTEEN_HOURS} from '../lib/food'
 
 const RESOURCES={
   canteens:{label:'Canteens',fields:[['name','Name'],['location','Location'],['lat','Latitude','number'],['lng','Longitude','number'],['opens_at','Opens (hour)','number'],['closes_at','Closes (hour)','number'],['known_for','Known for'],['colour','Colour']],create:true},
@@ -19,7 +20,9 @@ const RESOURCES={
   likes:{label:'Likes'},
   canteen_closure_reports:{label:'Closure reports'}
 }
-const newRecord=kind=>kind==='canteens'?{opens_at:7,closes_at:18,colour:'#E8492F'}:{}
+const newRecord = kind => kind === 'canteens'
+  ? { opens_at: DEFAULT_CANTEEN_HOURS.opensAt, closes_at: DEFAULT_CANTEEN_HOURS.closesAt, colour: '#E8492F' }
+  : {}
 const recordKey=r=>r.id||[r.user_id,r.post_id,r.canteen_id,r.week_start].filter(Boolean).join('/')
 const title=r=>r.name||r.full_name||r.caption||r.body||r.canteen_id||r.post_id||r.id
 const summary=r=>[r.location,r.rating,r.price!=null?'Rs '+r.price:'',r.week_start,r.created_at?.slice(0,10),r.reported_at?.slice(0,16)].filter(Boolean).join(' · ')

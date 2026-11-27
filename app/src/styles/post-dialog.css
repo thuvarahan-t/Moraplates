@@ -1,0 +1,104 @@
+/* ---------- Post your plate: compact sheet with a fixed header and an always-visible Post button ---------- */
+dialog#dlg.pd{overflow:hidden;max-height:min(calc(100dvh - 24px),860px);padding:0}
+dialog#dlg.pd[open]{display:flex;flex-direction:column}
+#dlg.pd #pf{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:0;padding:0}
+#dlg.pd #pf::before{display:none}
+.pd .dh{position:relative;flex:none;padding:14px 14px 10px 20px}
+.pd .dh h2{font-size:23px}
+.pd .x{width:40px;height:40px}
+.pf-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:2px 20px 16px;display:flex;flex-direction:column;gap:14px}
+.pf-foot{flex:none;display:flex;flex-direction:column;gap:8px;padding:12px 20px calc(12px + env(safe-area-inset-bottom,0px));
+  background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(8px);border-top:1px solid var(--line)}
+.pd .pf-foot .err{margin:0;min-height:0;text-align:center;font-size:13.5px;animation:pfShake .4s ease}
+@keyframes pfShake{25%{transform:translateX(-5px)}50%{transform:translateX(4px)}75%{transform:translateX(-2px)}}
+.pd .pf-foot .btn{min-height:50px}
+
+/* small uppercase labels, the same for every section */
+.pd .fl{flex:none;gap:5px}
+.pd .fl>span,.pd legend{font-size:11.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);margin:0}
+.pd .fl>span em{text-transform:none;letter-spacing:0;font-size:12px}
+
+/* photo tile beside the two dropdowns */
+.pf-top{--ph:112px;display:grid;grid-template-columns:var(--ph) minmax(0,1fr);gap:12px;align-items:stretch}
+#pf .pf-photo{min-height:0;height:auto;padding:8px;gap:6px;border-radius:18px;font-size:13px;text-align:center;line-height:1.2;
+  background:color-mix(in srgb,var(--soft) 55%,var(--card))}
+#pf .pf-photo .ic{color:var(--tom);transition:transform .3s var(--spring)}
+#pf .pf-photo:hover .ic{transform:scale(1.1) rotate(-6deg)}
+#pf .pf-photo.has{border-style:solid;border-color:transparent;padding:0}
+#pf .pf-photo img{object-fit:cover;background:none;animation:pfPhoto .45s var(--spring)}
+@keyframes pfPhoto{from{opacity:0;transform:scale(.9)}}
+#pf .pf-photo .chg{right:6px;bottom:6px;padding:3px 10px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.pf-where{display:flex;flex-direction:column;gap:10px;min-width:0}
+.pd .dd-btn{min-height:50px;padding:6px 12px;gap:10px;border-radius:14px}
+.dd-val.dd-empty-val b{color:var(--mut);font-weight:600}
+.dd-btn:disabled .dd-chev{opacity:.4}
+
+/* dropdown panel with search (spans the full form width beside the photo) */
+.dd-pop{position:absolute;z-index:6;left:0;right:0;top:calc(100% + 6px);display:flex;flex-direction:column;max-height:min(320px,46dvh);
+  background:var(--card);border:1px solid var(--line);border-radius:18px;overflow:hidden;scroll-margin:16px;
+  box-shadow:0 22px 44px -20px light-dark(rgba(107,30,42,.5),rgba(0,0,0,.75));transform-origin:top center;animation:ddIn .24s var(--spring)}
+.pf-where .dd-pop{left:calc(-1 * (var(--ph) + 12px))}
+.dd-pop .dd-list{position:static;flex:1 1 auto;min-height:0;max-height:none;overflow-y:auto;border:0;border-radius:0;box-shadow:none;background:none;animation:none}
+.dd-search{display:flex;align-items:center;gap:8px;margin:6px 6px 0;padding:0 12px;border-radius:12px;background:var(--chip);color:var(--mut);flex:none}
+.dd-search:focus-within{box-shadow:0 0 0 2px var(--tom);color:var(--brand)}
+.fl .dd-search input,.dd-search input{flex:1;min-width:0;min-height:42px;border:0;border-radius:0;padding:0;background:none;box-shadow:none;font-size:16px;color:var(--ink);outline:0}
+.fl .dd-search input:focus{box-shadow:none}
+.dd-list mark{background:color-mix(in srgb,var(--mus) 38%,transparent);color:inherit;border-radius:3px}
+.dd-list li.act{margin-top:4px;border-top:1px dashed var(--line);border-radius:0 0 12px 12px}
+.dd-list li.act b{color:var(--tomt)}
+.dd-list li.act:first-child{border-top:0;border-radius:12px}
+.dd-empty{padding:12px 12px 4px;color:var(--mut);font-size:13.5px;text-align:center;cursor:default}
+
+/* new food: name + price on one row */
+.pf-new{display:grid;grid-template-columns:minmax(0,1fr) 104px;gap:10px}
+.pd .pf-new input{min-height:46px}
+
+/* star rating */
+.stars{gap:5px;--sc:var(--mus)}
+.stars.t-avoid{--sc:var(--tom)}.stars.t-okay{--sc:var(--mus)}.stars.t-super{--sc:var(--leaf)}
+.st-wrap{display:flex;align-items:center;flex-wrap:wrap;gap:6px 12px;padding:8px 12px;border-radius:18px;background:var(--card);border:1px solid var(--line);
+  transition:background .4s,border-color .4s}
+.t-avoid .st-wrap{background:var(--ab);border-color:color-mix(in srgb,var(--tom) 35%,transparent)}
+.t-okay .st-wrap{background:var(--ob);border-color:color-mix(in srgb,var(--mus) 45%,transparent)}
+.t-super .st-wrap{background:var(--sb);border-color:color-mix(in srgb,var(--leaf) 40%,transparent)}
+.st-row{display:flex;gap:0}
+.st{position:relative;display:grid;place-items:center;width:38px;height:42px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.st input{position:absolute;inset:0;margin:0;opacity:0;cursor:pointer}
+.st-ic{display:grid;place-items:center;border-radius:10px;pointer-events:none}
+.st svg{width:31px;height:31px;fill:color-mix(in srgb,var(--line) 70%,var(--card));stroke:color-mix(in srgb,var(--mut) 40%,transparent);stroke-width:1.2;stroke-linejoin:round;
+  transition:fill .25s,stroke .25s,transform .25s var(--spring),filter .25s}
+.st.on svg{fill:var(--sc);stroke:var(--sc);filter:drop-shadow(0 2px 4px color-mix(in srgb,var(--sc) 45%,transparent))}
+.st.on .st-ic{animation:stPop .5s var(--spring) both;animation-delay:calc(var(--i) * 45ms)}
+@keyframes stPop{0%{transform:scale(.55) rotate(-25deg)}60%{transform:scale(1.25) rotate(8deg)}100%{transform:none}}
+@media(hover:hover){.st:hover svg{transform:scale(1.14)}}
+.st input:focus-visible+.st-ic{outline:3px solid var(--tom);outline-offset:1px}
+.stars:disabled .st{cursor:default;opacity:.6}
+.st-verdict{flex:1;min-width:128px;min-height:42px;display:flex;align-items:center}
+.st-hint{font-size:13.5px;font-weight:600;color:var(--mut);animation:stHint 1.8s ease-in-out infinite}
+@keyframes stHint{50%{opacity:.55}}
+.st-chip{display:inline-grid;grid-template-columns:auto auto;grid-template-rows:auto auto;column-gap:8px;align-items:center;animation:vIn .45s var(--spring) both}
+.st-face{grid-row:span 2;font-size:30px;line-height:1;display:inline-block}
+.st-chip b{font:800 19px/1 'Bricolage Grotesque',sans-serif}
+.st-chip small{font-size:12.5px;line-height:1.2;color:var(--mut);font-weight:600}
+.st-chip.avoid b{color:var(--at)}.st-chip.okay b{color:var(--ot)}.st-chip.super b{color:var(--st)}
+.st-chip.avoid .st-face{animation:vShake .55s ease .1s}
+.st-chip.okay .st-face{animation:vBob .7s var(--spring)}
+.st-chip.super .st-face{animation:vJump .75s var(--spring)}
+@keyframes vIn{from{opacity:0;transform:translateY(6px) scale(.9)}}
+@keyframes vShake{20%{transform:rotate(-14deg)}40%{transform:rotate(12deg)}60%{transform:rotate(-8deg)}80%{transform:rotate(4deg)}}
+@keyframes vBob{40%{transform:translateY(-4px)}}
+@keyframes vJump{0%{transform:scale(.4)}35%{transform:translateY(-10px) scale(1.25) rotate(-8deg)}65%{transform:translateY(0) scale(.95)}100%{transform:none}}
+
+.pd .pf-say textarea{min-height:66px;padding:10px 12px}
+.pd .crop-editor{margin:0}
+
+@media(min-width:761px){.pf-top{--ph:150px}}
+@media(max-width:760px){
+  dialog#dlg.pd{max-height:94dvh;padding-bottom:0}
+  .pd .dh{padding-top:20px}
+  .pd .dh::before{content:"";position:absolute;top:7px;left:50%;width:40px;height:5px;margin-left:-20px;border-radius:9px;background:var(--line)}
+  .pf-body{padding:2px 16px 14px;gap:12px}
+  .pf-foot{padding-left:16px;padding-right:16px}
+}
+@media(max-width:360px){.pf-top{--ph:96px}.st{width:34px}.st svg{width:28px;height:28px}}
+.dd-search input::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none}

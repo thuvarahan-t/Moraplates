@@ -17,3 +17,7 @@ Thumbs.db
 
 # Vite dependency cache
 .vite/
+
+# Playwright output
+test-results/
+playwright-report/

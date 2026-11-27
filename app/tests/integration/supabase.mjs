@@ -9,6 +9,11 @@ assert.ok(['127.0.0.1','localhost'].includes(new URL(url).hostname),'Refusing no
 const client=key=>createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}})
 const service=client(serviceKey)
 const check=({data,error})=>{if(error)throw error;return data}
+const nextColomboMidnight = time => {
+  const day = 24 * 60 * 60_000
+  const offset = 330 * 60_000
+  return (Math.floor((time + offset) / day) + 1) * day - offset
+}
 const users=[]
 let food,post,path,adminCanteen
 try{
@@ -32,10 +37,33 @@ try{
   assert.equal(check(await a.client.from('posts').select('id, seen:post_views()').eq('id',post).is('seen',null)).length,0)
   assert.equal(check(await b.client.from('posts').select('id, seen:post_views()').eq('id',post).is('seen',null)).length,1)
   assert.equal(check(await b.client.from('post_views').select('post_id').eq('post_id',post)).length,0)
-  check(await a.client.rpc('report_canteen_closed',{canteen:'wala'}))
-  assert.ok(check(await b.client.from('canteen_standings').select('reported_closed_until').eq('id','wala').single()).reported_closed_until)
-  check(await a.client.rpc('withdraw_canteen_closed',{canteen:'wala'}))
-  assert.equal(check(await b.client.from('canteen_standings').select('reported_closed_until').eq('id','wala').single()).reported_closed_until,null)
+  const canteen = { canteen: 'wala' }
+  const closedUntil = async () => check(await b.client.from('canteen_standings')
+    .select('reported_closed_until').eq('id', canteen.canteen).single()).reported_closed_until
+  assert.ok((await client(anon).rpc('report_canteen_closed_today', canteen)).error, 'Guests cannot report closures')
+
+  const beforeTemporary = Date.now()
+  check(await a.client.rpc('report_canteen_closed', canteen))
+  const temporaryExpiry = Date.parse(await closedUntil())
+  assert.ok(temporaryExpiry >= beforeTemporary + 59 * 60_000 && temporaryExpiry <= Date.now() + 61 * 60_000)
+
+  const beforeToday = Date.now()
+  check(await a.client.rpc('report_canteen_closed_today', canteen))
+  const todayExpiry = await closedUntil()
+  assert.ok([nextColomboMidnight(beforeToday), nextColomboMidnight(Date.now())].includes(Date.parse(todayExpiry)))
+
+  check(await a.client.rpc('report_canteen_closed', canteen))
+  check(await b.client.rpc('withdraw_canteen_closed', canteen))
+  assert.equal(await closedUntil(), todayExpiry, 'An active day report survives a shorter report and another student’s withdrawal')
+
+  check(await b.client.rpc('report_canteen_closed', canteen))
+  const combinedExpiry = Date.parse(await closedUntil())
+  check(await a.client.rpc('withdraw_canteen_closed', canteen))
+  const remainingExpiry = Date.parse(await closedUntil())
+  assert.ok(remainingExpiry > Date.now(), 'The other student’s temporary report remains')
+  assert.equal(combinedExpiry, Math.max(Date.parse(todayExpiry), remainingExpiry))
+  check(await b.client.rpc('withdraw_canteen_closed', canteen))
+  assert.equal(await closedUntil(), null)
   assert.equal(check(await a.client.rpc('is_admin')),false)
   assert.ok((await a.client.rpc('admin_list',{kind:'canteens',page_offset:0})).error)
   check(await service.from('admin_users').insert({user_id:b.id}))

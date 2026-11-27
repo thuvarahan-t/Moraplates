@@ -3,7 +3,7 @@ import { Link } from './NavLinks'
 import Slideshow, { Credit, Dots } from './Slideshow'
 import { ChevronIcon } from './icons'
 import { useQuery } from '../data/useQuery'
-import { fetchCanteenPhotos } from '../data/queries'
+import { CANTEEN_GALLERY_KEY, fetchCanteenGallery } from '../data/queries'
 import { byVotes } from '../lib/food'
 import { REDUCED_MOTION } from '../lib/motion'
 import { supabase } from '../lib/supabase'
@@ -17,7 +17,7 @@ const NEXT_CANTEEN_MS = 6000
  * the next canteen every few seconds and can be swiped. Photos are added on the canteen page.
  */
 export default function HomeBanner({ canteens }) {
-  const { data: photos } = useQuery(() => (supabase ? fetchCanteenPhotos(null, 150) : Promise.resolve([])), [])
+  const { data: photos } = useQuery(CANTEEN_GALLERY_KEY, fetchCanteenGallery, { enabled: !!supabase })
   const track = useRef(null)
   const [at, setAt] = useState(0)
   const paused = useRef(0)

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import People from '../components/People'
 import CropPhoto from '../components/CropPhoto'
-import { useAdmin } from '../lib/useAdmin'
+import { checkAdmin } from '../data/admin'
 import { samplePosts } from '../data/feed'
 import { Navigate, useNavigate, useParams } from 'react-router'
 import { Link } from '../components/NavLinks'
@@ -17,13 +17,18 @@ import { RATING } from '../lib/format'
 import { usePost } from '../lib/post'
 import { supabase } from '../lib/supabase'
 import { useQuery } from '../data/useQuery'
+import { queryKey } from '../data/queryCache'
 import { fetchPosts, fetchProfilePage, fetchPublicProfile, friendly, updateAvatar, updateProfile } from '../data/queries'
+import { InstallButton } from '../components/InstallPrompt'
 
 const TONES = { leaf: ['var(--sb)', 'var(--st)'], mus: ['var(--ob)', 'var(--ot)'], tom: ['var(--ab)', 'var(--at)'] }
 
 /** /profile: the signed-in student's own profile. */
 export default function Profile() {
   const { session, profile, ready } = useAuth()
+  const { cache } = usePost()
+  const uid = session?.user?.id
+  const details = useQuery('own-profile', () => fetchProfilePage(uid, cache), { enabled: !!supabase && !!uid })
 
   if (!ready) return <section className="view" />
   if (!supabase || !session) {
@@ -38,8 +43,8 @@ export default function Profile() {
       </div></div></section>
     )
   }
-  if (!profile) return <section className="view" />
-  return <OwnProfile uid={session.user.id} email={session.user.email} profile={profile} />
+  if (profile?.id !== uid) return <section className="view" />
+  return <OwnProfile uid={uid} email={session.user.email} profile={profile} details={details} />
 }
 
 /** /u/:id: anyone's public profile, opened by tapping a name or photo on a post. */
@@ -47,7 +52,7 @@ export function UserProfile() {
   const { id } = useParams()
   const { session } = useAuth()
   const uid = session?.user?.id
-  const { data, error, loading } = useQuery(() => supabase ? fetchPublicProfile(id, uid) : Promise.resolve((() => { const posts=samplePosts().filter(p=>p.userId===id); const a=posts[0]?.author; return a ? {profile:{id,fullName:a.name,faculty:a.faculty},stats:{plates:posts.length},posts} : null })()), [id, uid])
+  const { data, error, loading } = useQuery(queryKey('public-profile', id), () => supabase ? fetchPublicProfile(id, uid) : Promise.resolve((() => { const posts=samplePosts().filter(p=>p.userId===id); const a=posts[0]?.author; return a ? {profile:{id,fullName:a.name,faculty:a.faculty},stats:{plates:posts.length},posts} : null })()), { enabled: id !== uid })
 
   if (uid && id === uid) return <Navigate to="/profile" replace />
   if (loading && !data) return <section className="view"><Loader label="Loading profile" /></section>
@@ -76,10 +81,10 @@ export function UserProfile() {
   )
 }
 
-function OwnProfile({ uid, email, profile }) {
+function OwnProfile({ uid, email, profile, details }) {
   const { signOut, refreshProfile } = useAuth()
-  const admin=useAdmin()
-  const { openPost } = usePost()
+  const { data: showAdmin } = useQuery('admin-link', () => checkAdmin().catch(() => false))
+  const { openPost, invalidate } = usePost()
   const { toast } = useFx()
   const navigate = useNavigate()
   const leave = async () => {
@@ -87,7 +92,7 @@ function OwnProfile({ uid, email, profile }) {
     toast('Signed out. See you at lunch!')
     navigate('/welcome')
   }
-  const { data, error, reload } = useQuery(() => fetchProfilePage(uid), [uid])
+  const { data, error, reload } = details
   const [editing, setEditing] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [cropFile,setCropFile]=useState(null)
@@ -102,6 +107,7 @@ function OwnProfile({ uid, email, profile }) {
     try {
       await updateAvatar(uid, file, profile.avatarPath)
       refreshProfile()
+      invalidate()
       toast('Profile photo updated')
     } catch (err) {
       toast(friendly(err))
@@ -145,7 +151,7 @@ function OwnProfile({ uid, email, profile }) {
       posts={data?.posts}
       platesTitle="Your plates"
       emptyPlates="No plates yet. Tap + to post your first one."
-      after={<div className="cacts">{admin.allowed&&<Link className="btn sm" to="/admin">Admin console</Link>}<button className="btn ghost sm signout" onClick={leave}><LogOutIcon />Sign out</button></div>}
+      after={<div className="cacts">{showAdmin === true && <Link className="btn sm" to="/admin">Admin console</Link>}<InstallButton/><button className="btn ghost sm signout" onClick={leave}><LogOutIcon />Sign out</button></div>}
     />
   )
 }
@@ -214,6 +220,7 @@ function ProfileBody({ top, head, below, extra, stats: s, posts, authorId, viewe
 
 function EditProfile({ uid, profile, onDone }) {
   const { refreshProfile } = useAuth()
+  const { invalidate } = usePost()
   const { toast } = useFx()
   const [f, setF] = useState({ fullName: profile.fullName, faculty: profile.faculty ?? '', batch: profile.batch ?? '' })
   const [err, setErr] = useState('')
@@ -227,6 +234,7 @@ function EditProfile({ uid, profile, onDone }) {
     try {
       await updateProfile(uid, { fullName: f.fullName.trim(), faculty: f.faculty.trim(), batch: f.batch.trim() })
       refreshProfile()
+      invalidate()
       toast('Profile saved')
       onDone()
     } catch (e2) {

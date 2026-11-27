@@ -5,6 +5,7 @@ import BottomNav from './components/BottomNav'
 import { PostProvider } from './lib/post'
 import { useAuth } from './lib/auth'
 import Loader from './components/Loader'
+import InstallPrompt from './components/InstallPrompt'
 
 export default function Layout() {
   const { pathname } = useLocation()
@@ -17,6 +18,7 @@ export default function Layout() {
       {/* Keyed by path so each view remounts and replays its entrance animation. */}
       <main>{ready ? <Fragment key={pathname}><Outlet /></Fragment> : <Loader />}</main>
       <BottomNav />
+      <InstallPrompt />
     </PostProvider>
   )
 }

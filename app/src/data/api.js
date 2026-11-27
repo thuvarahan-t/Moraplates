@@ -1,7 +1,7 @@
 import { supabase } from '../lib/supabase'
 import { SAMPLE_CANTEENS, SAMPLE_FOODS, SAMPLE_PLATES_TODAY } from './sample'
 
-import { toCanteen, toFood } from './queries'
+import { fetchCanteenStandings, fetchFoodStats } from './queries'
 
 /** Midnight today in Colombo (UTC+5:30, no DST), as an ISO string. */
 function startOfColomboDay() {
@@ -10,18 +10,17 @@ function startOfColomboDay() {
   return new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate()) - offset).toISOString()
 }
 
-/** Data for the Home page, or null when there is no Supabase project (use sampleHome()). */
-export async function fetchHome() {
+/** Data for the Home page, sharing catalog reads with the rankings. */
+export async function fetchHome(cache) {
   const [canteens, foods, today] = await Promise.all([
-    supabase.from('canteen_standings').select('*'),
-    supabase.from('food_stats').select('*'),
+    cache.load('canteen-standings', fetchCanteenStandings),
+    cache.load('food-stats', fetchFoodStats),
     supabase.from('posts').select('id', { count: 'exact', head: true }).gte('created_at', startOfColomboDay()),
   ])
-  const error = canteens.error || foods.error || today.error
-  if (error) throw error
+  if (today.error) throw today.error
   return {
-    canteens: canteens.data.map(toCanteen),
-    foods: foods.data.map(toFood),
+    canteens,
+    foods,
     platesToday: today.count ?? 0,
   }
 }

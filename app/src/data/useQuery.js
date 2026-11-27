@@ -2,27 +2,44 @@ import { useCallback, useEffect, useState } from 'react'
 import { usePost } from '../lib/post'
 import { useAuth } from '../lib/auth'
 
-/**
- * Runs an async loader and reloads it when `deps` change, after any new post,
- * or when reload() is called. Keeps the old data while reloading so pages don't flash.
- */
-export function useQuery(load, deps) {
-  const { version } = usePost()
-  const { ready } = useAuth() // wait for the session so pages don't fetch twice
+/** Reuse recent data on navigation, and keep the last result visible during revalidation. */
+export function useQuery(key, load, { enabled = true, initialData } = {}) {
+  const { cache, version } = usePost()
+  const { ready } = useAuth()
   const [tick, setTick] = useState(0)
-  const [state, setState] = useState({ data: undefined, error: null, loading: true })
+  const [state, setState] = useState(null)
 
   useEffect(() => {
-    if (!ready) return
+    if (!ready || !enabled) return
     let live = true
-    setState(s => ({ ...s, loading: true }))
-    load()
-      .then(data => live && setState({ data, error: null, loading: false }))
-      .catch(error => { console.error(error); if (live) setState({ data: undefined, error, loading: false }) })
+    const cached = cache.read(key)
+    if (cache.fresh(key) !== undefined) {
+      setState({ cache, key, data: cached })
+      return
+    }
+    setState(previous => ({
+      cache, key,
+      data: cached !== undefined ? cached : (previous?.cache === cache && previous.key === key ? previous.data : undefined),
+    }))
+    cache.load(key, load).then(data => {
+      if (live) setState({ cache, key, data })
+    }).catch(error => {
+      if (!live) return
+      console.error(error)
+      setState(previous => ({ ...previous, error }))
+    })
     return () => { live = false }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [...deps, ready, version, tick])
+    // The key describes the loader's arguments. Inline loaders need not stay referentially stable.
+  }, [cache, key, enabled, ready, version, tick])
 
-  const reload = useCallback(() => setTick(t => t + 1), [])
-  return { ...state, reload }
+  const reload = useCallback(() => {
+    cache.remove(key)
+    setTick(t => t + 1)
+  }, [cache, key])
+  const result = state?.cache === cache && state.key === key ? state : null
+  const cached = enabled ? cache.read(key) : undefined
+  const data = !enabled ? initialData : (cached !== undefined ? cached : (result?.data !== undefined ? result.data : initialData))
+  const error = enabled && data === undefined ? result?.error ?? null : null
+  const loading = enabled && data === undefined && !error
+  return { data, loading, error, reload }
 }

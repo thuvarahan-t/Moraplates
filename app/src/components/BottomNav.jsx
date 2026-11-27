@@ -1,36 +1,13 @@
-import { useLayoutEffect, useRef } from 'react'
-import { useLocation } from 'react-router'
-import { NavLink } from './NavLinks'
+import { NavLink } from 'react-router'
 import { FeedIcon, PlusIcon, StoreIcon, TrophyIcon, UserIcon } from './icons'
 import { usePost } from '../lib/post'
 
-/** Floating glass tab bar for phones (shown under 760px by CSS), with a sliding active pill. */
+/** The phone tab bar stays live while the router switches pages. */
 export default function BottomNav() {
   const { openPost } = usePost()
-  const { pathname } = useLocation()
-  const bar = useRef(null)
-  const pill = useRef(null)
-
-  useLayoutEffect(() => {
-    const place = () => {
-      if (!bar.current || !pill.current) return
-      const a = bar.current.querySelector('a[aria-current]')
-      const el = pill.current
-      if (!a) { el.style.opacity = '0'; return }
-      el.style.opacity = '1'
-      el.style.width = a.offsetWidth + 'px'
-      el.style.height = a.offsetHeight + 'px'
-      el.style.transform = `translate(${a.offsetLeft}px, ${a.offsetTop}px)`
-    }
-    place()
-    addEventListener('resize', place)
-    document.fonts?.ready.then(place)
-    return () => removeEventListener('resize', place)
-  }, [pathname])
 
   return (
-    <nav className="bnav" aria-label="Main" ref={bar}>
-      <span className="bpill" aria-hidden="true" ref={pill} />
+    <nav className="bnav" aria-label="Main">
       <NavLink to="/" end><FeedIcon />Feed</NavLink>
       <NavLink to="/canteens"><StoreIcon />Canteens</NavLink>
       <button className="plus" onClick={openPost} aria-label="Post your plate">
