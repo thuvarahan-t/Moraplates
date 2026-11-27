@@ -6,7 +6,15 @@ import {
 import { decodePhoto, jpegBlob } from '../lib/crop'
 import { ADJUSTMENTS, NO_ADJUST, PRESETS, applyLook, autoAdjust, defaultEdit, frameFor, isNeutral, makeBase, mixLook, renderEdit } from '../lib/photoEdit'
 
-const RATIOS = [[null, 'Original', ImageIcon], [4 / 5, 'Portrait', RectangleVertical], [1, 'Square', Square], [4 / 3, 'Landscape', RectangleHorizontal]]
+const RATIOS = [
+  [null, 'Original', ImageIcon],
+  [1, 'Square', Square],
+  [4 / 5, '4:5', RectangleVertical],
+  [3 / 4, '3:4', RectangleVertical],
+  [9 / 16, '9:16', RectangleVertical],
+  [4 / 3, '4:3', RectangleHorizontal],
+  [16 / 9, '16:9', RectangleHorizontal],
+]
 const ADJ_ICONS = { brightness: Sun, contrast: Contrast, saturation: Droplet, warmth: Thermometer, fade: CloudFog, vignette: Aperture }
 const TABS = [['crop', 'Crop', Crop], ['filters', 'Filters', Sparkles], ['adjust', 'Adjust', SlidersHorizontal]]
 const clamp01 = v => Math.max(0, Math.min(1, v))

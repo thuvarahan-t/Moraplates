@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
+import { tapHaptic } from '../lib/feedback'
 import { centreOf, useFx } from '../lib/fx'
 import { uploadPhoto } from '../lib/photos'
+import { updateOwnPost } from '../data/queries'
 import { SAMPLE_CANTEENS, SAMPLE_FOODS } from '../data/sample'
 import { CameraIcon, CloseIcon } from './icons'
 import Dropdown from './Dropdown'
@@ -12,6 +14,7 @@ import { usePhotoPick } from '../lib/usePhotoPick'
 import StarRating, { starsToRating } from './StarRating'
 
 const NEW = '__new'
+const RATING_STARS = { avoid: 2, okay: 3, super: 4 }
 
 async function loadMenu() {
   if (!supabase) return { canteens: SAMPLE_CANTEENS, foods: SAMPLE_FOODS }
@@ -35,8 +38,10 @@ export default function PostDialog({ request, onClose, onPosted }) {
   const submitBtn = useRef(null)
   const nameInput = useRef(null)
   const navigate = useNavigate()
+  const { pathname } = useLocation()
   const { session } = useAuth()
   const { toast, confetti } = useFx()
+  const editPost = request.post
 
   const [menu, setMenu] = useState(null)
   const [canteenId, setCanteenId] = useState(request.canteenId)
@@ -44,8 +49,8 @@ export default function PostDialog({ request, onClose, onPosted }) {
   const [openFood, setOpenFood] = useState(0)
   const [newName, setNewName] = useState('')
   const [newPrice, setNewPrice] = useState('')
-  const [stars, setStars] = useState(0)
-  const [caption, setCaption] = useState('')
+  const [stars, setStars] = useState(RATING_STARS[editPost?.rating] ?? 0)
+  const [caption, setCaption] = useState(editPost?.caption ?? '')
   const pic = usePhotoPick()
   const { photo, preview } = pic
   const [err, setErr] = useState('')
@@ -53,18 +58,28 @@ export default function PostDialog({ request, onClose, onPosted }) {
 
   // Signed out: send them to sign in instead of letting them fill in a form they can't submit.
   const needsSignIn = supabase && !session
+  const wrongAuthor = editPost && session?.user.id !== editPost.userId
   useEffect(() => {
     if (!needsSignIn) return
     onClose()
     navigate('/welcome')
-    toast('Sign in with your @uom.lk email to post')
-  }, [needsSignIn, onClose, navigate, toast])
+    toast(editPost ? 'Sign in with your @uom.lk email to edit your post' : 'Sign in with your @uom.lk email to post')
+  }, [needsSignIn, onClose, navigate, toast, editPost])
 
   useEffect(() => {
     if (needsSignIn) return
+    if (wrongAuthor) { onClose(); return }
     dlg.current?.showModal()
-    loadMenu().then(setMenu).catch(e => { console.error(e); setErr("Couldn't load the menu. Check your connection.") })
-  }, [needsSignIn])
+    let active = true
+    loadMenu().then(data => {
+      if (active) setMenu(data)
+    }).catch(error => {
+      if (!active) return
+      console.error(error)
+      setErr("Couldn't load the menu. Check your connection.")
+    })
+    return () => { active = false }
+  }, [needsSignIn, wrongAuthor, onClose])
 
   // Only foods from the chosen canteen. Nothing is pre-picked unless the dialog was opened from a canteen or dish.
   const cid = menu?.canteens.some(c => c.id === canteenId) ? canteenId : null
@@ -73,7 +88,7 @@ export default function PostDialog({ request, onClose, onPosted }) {
 
   useEffect(() => { if (fid === NEW) nameInput.current?.focus({ preventScroll: false }) }, [fid])
 
-  if (needsSignIn) return null
+  if (needsSignIn || wrongAuthor) return null
 
   const pickPhoto = e => {
     const f = e.target.files?.[0]
@@ -86,7 +101,7 @@ export default function PostDialog({ request, onClose, onPosted }) {
   const submit = async e => {
     e.preventDefault()
     if (busy || pic.editing || pic.processing) return
-    if (!photo) return setErr('Add a photo of your plate.')
+    if (!photo && !editPost) return setErr('Add a photo of your plate.')
     if (!cid) return setErr('Choose the canteen.')
     if (!fid) return setErr('Choose what you ate, or add it.')
     const price = Math.round(+newPrice)
@@ -101,6 +116,19 @@ export default function PostDialog({ request, onClose, onPosted }) {
     setErr('')
     let uploadedPath = null
     try {
+      if (editPost) {
+        const { photoCleanupFailed } = await updateOwnPost(editPost.id, session.user.id, {
+          canteenId: cid, foodId: fid, rating: starsToRating(stars), caption: caption.trim(), photo,
+        })
+        const savedPath = `/posts/${editPost.id}`
+        tapHaptic()
+        onPosted()
+        onClose()
+        if (pathname !== savedPath) navigate(savedPath)
+        toast(photoCleanupFailed ? 'Post updated. The previous photo could not be removed.' : 'Post updated')
+        return
+      }
+
       let foodRow = fid
       if (fid === NEW) {
         const { data, error } = await supabase.from('foods').insert({ canteen_id: cid, name: newName.trim(), price }).select('id').single()
@@ -114,6 +142,7 @@ export default function PostDialog({ request, onClose, onPosted }) {
 
       const [x, y] = centreOf(submitBtn.current)
       confetti(x, y, 26)
+      tapHaptic(18)
       onPosted()
       onClose()
       navigate('/')
@@ -121,19 +150,22 @@ export default function PostDialog({ request, onClose, onPosted }) {
     } catch (e2) {
       if (uploadedPath) await supabase.storage.from('photos').remove([uploadedPath])
       console.error(e2)
-      setErr(friendly(e2))
+      if (editPost && e2.code === '23503') setErr('That food is no longer available at this canteen. Choose another.')
+      else if (editPost && e2.code === '42501') setErr(e2.message)
+      else setErr(friendly(e2))
     } finally {
       setBusy(false)
     }
   }
 
   const canteen = menu?.canteens.find(c => c.id === cid)
+  const displayedPhoto = preview || editPost?.photo
 
   return (
     <dialog id="dlg" className="pd" ref={dlg} aria-labelledby="dlgT" onClose={onClose} onCancel={e=>{if(busy)e.preventDefault()}} onClick={e => !busy && e.target === dlg.current && dlg.current.close()}>
       <form id="pf" noValidate onSubmit={submit}>
         <div className="dh">
-          <h2 id="dlgT">Post your plate</h2>
+          <h2 id="dlgT">{editPost ? 'Edit your post' : 'Post your plate'}</h2>
           <button type="button" className="x" aria-label="Close" disabled={busy} onClick={() => dlg.current.close()}>
             <CloseIcon />
           </button>
@@ -143,8 +175,8 @@ export default function PostDialog({ request, onClose, onPosted }) {
           {pic.editing ? <CropPhoto file={pic.original} initial={pic.edit} onCancel={pic.closeEditor} onDone={pic.finishEdit} /> : (
             <div className="pf-top">
               <div className="pf-photo-wrap">
-                <label className={'pick pf-photo' + (preview ? ' has' : '') + (pic.processing ? ' busy' : '')}>
-                  {preview ? <><img src={preview} alt="Your plate" /><span className="chg">Change</span></>
+                <label className={'pick pf-photo' + (displayedPhoto ? ' has' : '') + (pic.processing ? ' busy' : '')}>
+                  {displayedPhoto ? <><img src={displayedPhoto} alt="Your plate" /><span className="chg">Change</span></>
                     : <><CameraIcon /><span>{pic.processing ? 'Adding…' : 'Add photo'}</span></>}
                   <input type="file" accept="image/*" onChange={pickPhoto} disabled={busy || pic.processing} aria-label="Photo of your plate" />
                 </label>
@@ -171,16 +203,20 @@ export default function PostDialog({ request, onClose, onPosted }) {
                       ...foods.map(f => ({ value: f.id, label: f.name, sub: 'Rs ' + f.price })),
                       ...(fid === NEW ? [{ value: NEW, label: newName.trim() || 'New food', sub: 'Adding to the menu' }] : []),
                     ]}
-                    action={{
+                    action={!editPost ? {
                       label: q => (q ? `+ Add “${q}”` : '+ Add a new food'),
                       sub: foods.length ? 'Not on the list? Add it to the menu' : 'No foods here yet. Add the first one',
                       onPick: q => { setFoodId(NEW); if (q) setNewName(q); setErr('') },
-                    }}
+                    } : undefined}
                     onChange={v => { setFoodId(v); setErr('') }}
                   />
                 </div>
               </div>
             </div>
+          )}
+
+          {editPost?.photo && photo && !pic.editing && (
+            <button type="button" className="mini pf-keep-photo" disabled={busy || pic.processing} onClick={pic.reset}>Keep original photo</button>
           )}
 
           {fid === NEW && !pic.editing && (
@@ -194,13 +230,15 @@ export default function PostDialog({ request, onClose, onPosted }) {
 
           <label className="fl pf-say">
             <span>Say something <em>{caption.length}/160</em></span>
-            <textarea maxLength={160} rows={2} placeholder="Spicy? Cold? Worth the queue?" value={caption} onChange={e => setCaption(e.target.value)} />
+            <textarea maxLength={160} rows={2} placeholder="Spicy? Cold? Worth the queue?" value={caption} disabled={busy} onChange={e => setCaption(e.target.value)} />
           </label>
         </div>
 
         <div className="pf-foot">
           {(err || pic.error) && <p className="err" role="alert">{err || pic.error}</p>}
-          <button className="btn wide" type="submit" ref={submitBtn} disabled={busy || !menu || pic.editing || pic.processing}>{busy ? 'Posting…' : 'Post to feed'}</button>
+          <button className="btn wide" type="submit" ref={submitBtn} disabled={busy || !menu || pic.editing || pic.processing}>
+            {editPost ? (busy ? 'Saving…' : 'Save changes') : (busy ? 'Posting…' : 'Post to feed')}
+          </button>
         </div>
       </form>
     </dialog>

@@ -26,13 +26,14 @@ export function useLikeToggle(postsRef, setPosts) {
   const userId = session?.user?.id
 
   const pending = useRef(new Set())
-  return useCallback(id => {
+  return useCallback((id, targetLiked) => {
     if (pending.current.has(id)) return false
     const p = postsRef.current?.find(x => x.id === id)
     if (!p) return false
+    const liked = targetLiked ?? !p.liked
+    if (liked === p.liked) return false
     if (supabase && !userId) { toast('Sign in with your @uom.lk email to like plates'); return false }
 
-    const liked = !p.liked
     const apply = l => setPosts(ps => ps?.map(x => (x.id === id ? { ...x, liked: l, likes: Math.max(0, x.likes + (x.liked === l ? 0 : l ? 1 : -1)) } : x)) ?? ps)
     apply(liked)
     if (supabase) {

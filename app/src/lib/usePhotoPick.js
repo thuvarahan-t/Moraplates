@@ -37,6 +37,14 @@ export function usePhotoPick({ fixedAspect, max = 1600 } = {}) {
 
   return {
     photo, preview, original, edit, editing, processing, error, pick,
+    reset: () => {
+      setOriginal(null)
+      setEdit(null)
+      setPhoto(null)
+      setPreview(null)
+      setEditing(false)
+      setError('')
+    },
     openEditor: () => setEditing(true),
     closeEditor: () => setEditing(false),
     finishEdit: (file, state) => { setPhoto(file); setEdit(state); setEditing(false) },

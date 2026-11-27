@@ -96,6 +96,37 @@ export async function setLike(postId, userId, liked) {
     : await supabase.from('likes').delete().eq('post_id', postId).eq('user_id', userId))
 }
 
+async function removePostPhoto(path) {
+  try {
+    const { error } = await supabase.storage.from('photos').remove([path])
+    return !error
+  } catch {
+    return false
+  }
+}
+
+export async function updateOwnPost(postId, userId, { canteenId, foodId, rating, caption, photo }) {
+  need()
+  const stagedPath = photo ? await uploadPhoto(userId, photo) : null
+  const result = await supabase.rpc('edit_own_post', {
+    target_post: postId,
+    target_canteen: canteenId,
+    target_food: foodId,
+    target_rating: rating,
+    target_caption: caption,
+    target_photo_path: stagedPath,
+  })
+  if (result.error) {
+    // Keep the staged image if a network failure leaves the commit uncertain.
+    const rejected = result.status >= 400 && result.status < 500 &&
+      /^(?:[0-9A-Z]{5}|PGRST\d{3})$/.test(result.error.code ?? '')
+    if (stagedPath && rejected) await removePostPhoto(stagedPath)
+    if (result.error.code === 'PGRST202') throw new Error('Post editing is unavailable right now.')
+    throw result.error
+  }
+  return { photoCleanupFailed: result.data ? !(await removePostPhoto(result.data)) : false }
+}
+
 // ---------------------------------------------------------------- comments
 
 const COMMENT_FIELDS = 'id, user_id, body, created_at, author:profiles!comments_user_id_fkey(full_name, avatar_path)'
