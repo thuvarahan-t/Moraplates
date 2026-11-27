@@ -1,4 +1,4 @@
-const AVATAR = [['var(--ob)', 'var(--ot)'], ['var(--sb)', 'var(--st)'], ['var(--ab)', 'var(--at)'], ['light-dark(#EEEDFE,#2A2650)', 'light-dark(#3C3489,#C9C4FF)']]
+const AVATAR = [['var(--ob)', 'var(--ot)'], ['var(--sb)', 'var(--st)'], ['var(--ab)', 'var(--at)'], ['#EEEDFE', '#3C3489']]
 
 /** Stable avatar tint from a name (avc() in index.html). */
 export function avatarStyle(name) {

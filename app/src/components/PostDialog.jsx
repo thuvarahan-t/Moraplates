@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import { centreOf, useFx } from '../lib/fx'
-import { compressImage, uploadPhoto } from '../lib/photos'
+import { uploadPhoto } from '../lib/photos'
 import { SAMPLE_CANTEENS, SAMPLE_FOODS } from '../data/sample'
 import { CameraIcon, CloseIcon } from './icons'
 import Dropdown from './Dropdown'
+import CropPhoto from './CropPhoto'
 
 const NEW = '__new'
 const RATINGS = [['super', 's', 'Super', 'Would eat again'], ['okay', 'o', 'Okay', "It's fine"], ['avoid', 'a', 'Avoid', 'Skip it']]
@@ -43,6 +44,7 @@ export default function PostDialog({ request, onClose, onPosted }) {
   const [rating, setRating] = useState('super')
   const [caption, setCaption] = useState('')
   const [photo, setPhoto] = useState(null)
+  const [cropFile, setCropFile] = useState(null)
   const [preview, setPreview] = useState(null)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
@@ -74,13 +76,15 @@ export default function PostDialog({ request, onClose, onPosted }) {
   const pickPhoto = e => {
     const f = e.target.files?.[0]
     if (!f) return
-    setPhoto(f)
-    setPreview(URL.createObjectURL(f))
+    e.target.value = ''
+    setCropFile(f)
     setErr('')
   }
 
   const submit = async e => {
     e.preventDefault()
+    if (busy || cropFile) return
+    if (!cid) return setErr('Choose a canteen.')
     if (!photo) return setErr('Add a photo of your plate.')
     const price = Math.round(+newPrice)
     if (fid === NEW) {
@@ -91,16 +95,18 @@ export default function PostDialog({ request, onClose, onPosted }) {
 
     setBusy(true)
     setErr('')
+    let uploadedPath = null
     try {
-      const path = await uploadPhoto(session.user.id, await compressImage(photo))
       let foodRow = fid
       if (fid === NEW) {
         const { data, error } = await supabase.from('foods').insert({ canteen_id: cid, name: newName.trim(), price }).select('id').single()
         if (error) throw error
         foodRow = data.id
       }
-      const { error } = await supabase.from('posts').insert({ canteen_id: cid, food_id: foodRow, rating, caption: caption.trim(), photo_path: path })
+      uploadedPath = await uploadPhoto(session.user.id, photo)
+      const { error } = await supabase.from('posts').insert({ canteen_id: cid, food_id: foodRow, rating, caption: caption.trim(), photo_path: uploadedPath })
       if (error) throw error
+      uploadedPath = null
 
       const [x, y] = centreOf(submitBtn.current)
       confetti(x, y, 26)
@@ -109,6 +115,7 @@ export default function PostDialog({ request, onClose, onPosted }) {
       navigate('/')
       toast('Plate posted to the feed')
     } catch (e2) {
+      if (uploadedPath) await supabase.storage.from('photos').remove([uploadedPath])
       console.error(e2)
       setErr(friendly(e2))
     } finally {
@@ -117,19 +124,19 @@ export default function PostDialog({ request, onClose, onPosted }) {
   }
 
   return (
-    <dialog id="dlg" ref={dlg} aria-labelledby="dlgT" onClose={onClose} onClick={e => e.target === dlg.current && dlg.current.close()}>
+    <dialog id="dlg" ref={dlg} aria-labelledby="dlgT" onClose={onClose} onCancel={e=>{if(busy)e.preventDefault()}} onClick={e => !busy && e.target === dlg.current && dlg.current.close()}>
       <form id="pf" noValidate onSubmit={submit}>
         <div className="dh">
           <h2 id="dlgT">Post your plate</h2>
-          <button type="button" className="x" aria-label="Close" onClick={() => dlg.current.close()}>
+          <button type="button" className="x" aria-label="Close" disabled={busy} onClick={() => dlg.current.close()}>
             <CloseIcon />
           </button>
         </div>
 
-        <label className="pick">
+        {cropFile ? <CropPhoto file={cropFile} onCancel={()=>setCropFile(null)} onDone={f=>{setPhoto(f);setPreview(URL.createObjectURL(f));setCropFile(null)}}/> : <label className="pick">
           {preview ? <><img src={preview} alt="Your plate" /><span className="chg">Change photo</span></> : <><CameraIcon /><span>Add a photo of your plate</span></>}
-          <input type="file" accept="image/*" onChange={pickPhoto} aria-label="Photo of your plate" />
-        </label>
+          <input type="file" accept="image/*" onChange={pickPhoto} disabled={busy} aria-label="Photo of your plate" />
+        </label>}
 
         <div className="fl">
           <span id="pf-canteen">Where did you eat?</span>
@@ -177,7 +184,7 @@ export default function PostDialog({ request, onClose, onPosted }) {
         </label>
 
         <p className="err" role="alert">{err}</p>
-        <button className="btn wide" type="submit" ref={submitBtn} disabled={busy || !menu}>{busy ? 'Posting…' : 'Post to feed'}</button>
+        <button className="btn wide" type="submit" ref={submitBtn} disabled={busy || !menu || !!cropFile}>{busy ? 'Posting…' : 'Post to feed'}</button>
       </form>
     </dialog>
   )

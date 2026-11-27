@@ -1,4 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { supabase } from '../lib/supabase'
+import { SAMPLE_CANTEENS, SAMPLE_FOODS } from '../data/sample'
+import { applyVote } from '../lib/vote'
 import { Link } from '../components/NavLinks'
 import CanteenThumb, { firstPhotoByCanteen } from '../components/CanteenThumb'
 import { CheckIcon, CrownIcon, HeartIcon } from '../components/icons'
@@ -19,7 +22,7 @@ const MIN_RATINGS = 3 // a dish needs this many ratings to rank
 export default function Top() {
   const { session } = useAuth()
   const uid = session?.user?.id
-  const { data, error, reload } = useQuery(() => fetchTop(uid), [uid])
+  const { data, error, reload } = useQuery(() => supabase ? fetchTop(uid) : Promise.resolve({canteens:[...SAMPLE_CANTEENS].sort((a,b)=>b.votes-a.votes),foods:SAMPLE_FOODS,foodies:[],myVote:null,photos:[]}), [uid])
   const canteens = data?.canteens ?? []
   const dishes = (data?.foods ?? []).filter(f => totalRatings(f) >= MIN_RATINGS)
     .sort((a, b) => superPercent(b) - superPercent(a) || totalRatings(b) - totalRatings(a)).slice(0, 5)
@@ -85,15 +88,20 @@ function VoteBoard({ canteens, myVote, photos, onVoted }) {
   const { toast, confetti } = useFx()
   const gate = useSignInGate()
   const [busy, setBusy] = useState(null)
+  const [local,setLocal]=useState({canteens,myVote})
+  useEffect(()=>setLocal({canteens,myVote}),[canteens,myVote])
   const thumbs = firstPhotoByCanteen(photos)
-  const list = [...canteens].sort((a, b) => a.name.localeCompare(b.name)) // stable order while votes move
+  const list = [...local.canteens].sort((a, b) => a.name.localeCompare(b.name)) // stable order while votes move
 
   const vote = async (c, e) => {
     if (busy || !gate('to vote')) return
     const btn = e.currentTarget
     setBusy(c.id)
+    const previous=local
+    const next=local.myVote===c.id?null:c.id
+    setLocal({canteens:applyVote(local.canteens,local.myVote,next),myVote:next})
     try {
-      if (myVote === c.id) {
+      if (next === null) {
         await removeVote()
         toast('Vote removed')
       } else {
@@ -104,6 +112,7 @@ function VoteBoard({ canteens, myVote, photos, onVoted }) {
       }
       onVoted()
     } catch (err) {
+      setLocal(previous)
       toast(friendly(err))
     } finally {
       setBusy(null)
@@ -115,15 +124,17 @@ function VoteBoard({ canteens, myVote, photos, onVoted }) {
       <div className="mh"><h3>Vote your favourite</h3><span>One vote a week · tap again to take it back</span></div>
       <div className="vlist">
         {list.map(c => {
-          const mine = myVote === c.id
+          const mine = local.myVote === c.id
+          const total = local.canteens.reduce((n,x)=>n+x.votes,0)
+          const pct = total ? Math.round(100*c.votes/total) : 0
           return (
             <div key={c.id} className={'vrow' + (mine ? ' mine' : '')}>
               <Link to={`/canteens/${c.id}`} className="vlink">
                 <CanteenThumb canteen={c} photo={thumbs[c.id]} size={52} />
-                <span className="vi"><b>{c.name}</b><small>{plural(c.votes, 'vote')} this week</small></span>
+                <span className="vi"><b>{c.name}</b><small>{plural(c.votes, 'vote')} · {pct}% of votes</small><span className="vote-meter" aria-hidden="true"><i style={{width:pct+'%'}}/></span></span>
               </Link>
-              <button className={'btn sm' + (mine ? ' voted' : '')} aria-pressed={mine} disabled={busy === c.id} onClick={e => vote(c, e)}>
-                {mine ? <><CheckIcon />Voted</> : <><HeartIcon />Vote</>}
+              <button className={'btn sm' + (mine ? ' voted' : '')} aria-pressed={mine} disabled={!!busy} onClick={e => vote(c, e)}>
+                {busy===c.id?'Saving…':mine ? <><CheckIcon />Voted</> : <><HeartIcon />Vote</>}
               </button>
             </div>
           )

@@ -5,6 +5,7 @@ import { router } from './router'
 import { FxProvider } from './lib/fx'
 import { AuthProvider } from './lib/auth'
 import './styles/global.css'
+import './styles/mobile-social.css'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
