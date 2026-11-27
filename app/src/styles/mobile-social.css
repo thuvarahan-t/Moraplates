@@ -21,33 +21,26 @@ input,textarea,select{font-size:16px!important}
 .feed-heading h2{font-size:clamp(24px,4vw,34px)}
 .feed-heading .mini,.people-heading .mini{display:inline-flex;align-items:center;gap:6px;min-height:44px}
 .feed-filters{
+  position:relative;
   display:grid;
-  grid-template-columns:minmax(0,1fr) 124px;
+  grid-template-columns:minmax(0,1fr) 132px;
   gap:8px;
   max-width:420px;
   margin-bottom:14px;
 }
-.feed-select{position:relative;min-width:0;color:var(--brand)}
-.feed-select select{
-  display:block;
-  width:100%;
+.feed-filters .dd-btn{
+  height:100%;
   min-height:44px;
-  appearance:none;
-  border:1px solid var(--line);
+  gap:6px;
+  padding:6px 10px 6px 12px;
   border-radius:14px;
-  background:var(--card);
-  padding:0 25px 0 12px;
-  font-weight:700;
-  text-overflow:ellipsis;
-  cursor:pointer;
+  color:var(--brand);
 }
-.feed-select .ic{
-  position:absolute;
-  inset-inline-end:8px;
-  top:50%;
-  transform:translateY(-50%);
-  pointer-events:none;
-}
+.feed-filters .dd-chev{width:16px;height:16px}
+.feed-filters .dd-val b{white-space:normal;overflow-wrap:anywhere}
+.feed-filters > .dd:first-of-type{position:static}
+.feed-filters > .dd:first-of-type .dd-pop{max-width:300px}
+.feed-filters > .dd:last-of-type .dd-pop{left:auto;min-width:150px}
 .feed-caught-up{display:flex;align-items:center;gap:12px;margin:14px 0;padding:12px 16px;border-radius:14px;background:var(--sb);color:var(--st)}
 .feed-caught-up svg{flex:none}
 .feed-caught-up h3{font-size:16px}
@@ -154,6 +147,7 @@ input,textarea,select{font-size:16px!important}
 .admin-actions{display:flex;flex:none}
 .danger{color:#a33220}
 @media(max-width:760px){
+  .feed-filters .dd-pop{scroll-margin-bottom:100px}
   .cbanner-photo{grid-row:1}
   .cbanner .ctx{padding-bottom:var(--banner-padding)}
   .cbanner-report{justify-self:stretch;padding:0}

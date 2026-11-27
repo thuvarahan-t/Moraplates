@@ -1,18 +1,20 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { CircleCheck, RefreshCw } from 'lucide-react'
+import Dropdown from './Dropdown'
 import People from './People'
 import PostCard from './PostCard'
 import Loader from './Loader'
-import { ChevronDownIcon } from './icons'
 import { useFeed } from '../data/feed'
 import { usePost } from '../lib/post'
 
-const SORTS = [['new', 'Latest'], ['hot', 'Most liked']]
+const SORTS = [{ value: 'new', label: 'Latest' }, { value: 'hot', label: 'Most liked' }]
 
 export default function FeedSection({ canteens }) {
   const { openPost } = usePost()
   const [filter, setFilter] = useState('all')
   const [sort, setSort] = useState('new')
+  const filterLabelId = useId()
+  const sortLabelId = useId()
   const byId = Object.fromEntries(canteens.map(c => [c.id, c]))
   const canteenId = byId[filter]?.id
   const { posts, loading, toggleLike, error, more, loadingMore, pageError, caughtUp, loadMore, markSeen, refresh } = useFeed(canteenId)
@@ -22,19 +24,11 @@ export default function FeedSection({ canteens }) {
     <div id="feed">
       <div className="feed-heading"><h2>Fresh plates</h2><button type="button" className="mini" onClick={refresh} disabled={loading}><RefreshCw size={16}/> Refresh</button></div>
       <div className="feed-filters">
-        <div className="feed-select">
-          <select aria-label="Canteen" value={canteenId ?? 'all'} onChange={e => setFilter(e.target.value)}>
-            <option value="all">All canteens</option>
-            {canteens.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-          <ChevronDownIcon size={16} />
-        </div>
-        <div className="feed-select">
-          <select aria-label="Sort posts" value={sort} onChange={e => setSort(e.target.value)}>
-            {SORTS.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-          </select>
-          <ChevronDownIcon size={16} />
-        </div>
+        <span className="sr" id={filterLabelId}>Canteen</span>
+        <Dropdown labelId={filterLabelId} value={canteenId ?? 'all'} onChange={setFilter}
+          options={[{ value: 'all', label: 'All canteens' }, ...canteens.map(c => ({ value: c.id, label: c.name }))]} />
+        <span className="sr" id={sortLabelId}>Sort posts</span>
+        <Dropdown labelId={sortLabelId} value={sort} options={SORTS} onChange={setSort} />
       </div>
       <div className="mobile-people"><People compact /></div>
       {loading && <Loader label="Loading plates" />}
