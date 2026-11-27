@@ -5,15 +5,15 @@ import { REDUCED_MOTION } from '../lib/motion'
  * Cross-fading photo slideshow that fills its (position:relative) parent.
  * `children(current, index, goTo)` renders overlays such as the credit chip and dots.
  */
-export default function Slideshow({ photos, interval = 4500, children }) {
+export default function Slideshow({ photos, interval = 4500, playing = true, children }) {
   const [i, setI] = useState(0)
   const n = photos.length
 
   useEffect(() => {
-    if (REDUCED_MOTION || n < 2) return
+    if (REDUCED_MOTION || !playing || n < 2) return
     const t = setInterval(() => { if (!document.hidden) setI(x => (x + 1) % n) }, interval)
     return () => clearInterval(t)
-  }, [n, interval])
+  }, [n, interval, playing])
 
   const idx = n ? i % n : 0
   return (
@@ -35,7 +35,7 @@ export function Dots({ count, index, goTo, label = 'photo' }) {
   return (
     <span className="dots">
       {Array.from({ length: count }, (_, k) => (
-        <button key={k} type="button" className={k === index ? 'on' : undefined} aria-label={`Show ${label} ${k + 1}`}
+        <button key={k} type="button" className={k === index ? 'on' : undefined} aria-label={`Show ${label} ${k + 1}`} aria-current={k === index ? 'true' : undefined}
           onClick={e => { e.preventDefault(); e.stopPropagation(); goTo?.(k) }} />
       ))}
     </span>

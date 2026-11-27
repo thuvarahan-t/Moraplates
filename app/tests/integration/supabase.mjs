@@ -15,7 +15,7 @@ const nextColomboMidnight = time => {
   return (Math.floor((time + offset) / day) + 1) * day - offset
 }
 const users=[]
-let food,post,path,adminCanteen
+let food,post,path,replacementPath,adminCanteen
 try{
   for(let i=0;i<2;i++){
     const email='test-'+randomUUID()+'@uom.lk',password='Test!'+randomUUID()
@@ -29,6 +29,36 @@ try{
   const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jT2QAAAAASUVORK5CYII=','base64')
   check(await a.client.storage.from('photos').upload(path,png,{contentType:'image/png'}))
   post=check(await a.client.from('posts').insert({canteen_id:'wala',food_id:food,rating:'super',photo_path:path,caption:'Integration test'}).select('id').single()).id
+  const guest = client(anon)
+  const foodChanges = { target_food: food, new_name: '  Renamed ' + randomUUID().slice(0, 8) + '  ', new_price: 275 }
+  assert.ok((await guest.rpc('update_food', foodChanges)).error, 'Guests cannot edit the menu')
+  assert.equal((await b.client.rpc('update_food', { ...foodChanges, new_price: 0 })).error?.code, '22023')
+  check(await b.client.rpc('update_food', foodChanges))
+  assert.deepEqual(check(await guest.from('foods').select('name, price, canteen_id, created_by').eq('id', food).single()), {
+    name: foodChanges.new_name.trim(), price: 275, canteen_id: 'wala', created_by: a.id,
+  })
+
+  check(await b.client.from('likes').insert({ post_id: post }))
+  const postDetails = async () => check(await guest.from('posts')
+    .select('created_at, user_id, caption, rating, photo_path, food_id, likes(count)').eq('id', post).single())
+  const original = await postDetails()
+  const postChanges = { target_post: post, target_canteen: 'wala', target_food: food, target_rating: 'okay', target_caption: '  Edited plate  ' }
+  assert.ok((await guest.rpc('edit_own_post', postChanges)).error, 'Guests cannot edit a post')
+  assert.equal((await b.client.rpc('edit_own_post', postChanges)).error?.code, '42501', 'Only the author can edit a post')
+  assert.equal((await a.client.rpc('edit_own_post', { ...postChanges, target_canteen: 'goda' })).error?.code, '23503', 'Food must match the selected canteen')
+  assert.equal((await a.client.rpc('edit_own_post', { ...postChanges, target_photo_path: b.id + '/photo.png' })).error?.code, '42501')
+  assert.deepEqual(await postDetails(), original)
+  assert.equal(check(await a.client.rpc('edit_own_post', postChanges)), null)
+  assert.deepEqual(await postDetails(), { ...original, rating: 'okay', caption: 'Edited plate' })
+
+  replacementPath = a.id + '/' + randomUUID() + '.png'
+  check(await a.client.storage.from('photos').upload(replacementPath, png, { contentType: 'image/png' }))
+  assert.equal(check(await a.client.rpc('edit_own_post', { ...postChanges, target_photo_path: replacementPath })), path)
+  assert.equal((await postDetails()).photo_path, replacementPath)
+  assert.equal(check(await a.client.rpc('edit_own_post', { ...postChanges, target_photo_path: path })), replacementPath)
+  check(await a.client.storage.from('photos').remove([replacementPath]))
+  replacementPath = null
+
   const unauthorized=await b.client.from('posts').delete().eq('id',post).select('id')
   assert.ok(unauthorized.error||unauthorized.data.length===0,'Other student must not delete post')
   await b.client.storage.from('photos').remove([path])
@@ -75,9 +105,32 @@ try{
   assert.equal(check(await a.client.from('canteens').select('location').eq('id',adminCanteen).single()).location,'Updated')
 
   const reopenCanteen = { canteen: adminCanteen }
-  const guest = client(anon)
+  const pin = (client, id, pinned = true) => client.rpc('set_canteen_pin', { target_canteen: id, pinned })
+  assert.ok((await pin(guest, 'wala')).error, 'Guests cannot write account pins')
+  const pinned = ['wala', 'goda', 'civil']
+  for (const [index, id] of pinned.entries()) {
+    assert.deepEqual(check(await pin(a.client, id)), pinned.slice(0, index + 1))
+  }
+  assert.deepEqual(check(await pin(a.client, 'wala')), pinned, 'Pinning again is idempotent')
+  assert.ok((await pin(a.client, 'village')).error, 'A fourth pin exceeds the limit')
+  assert.deepEqual(check(await b.client.from('canteen_pins').select('canteen_id')), [], 'Other accounts cannot see private pins')
+  check(await pin(a.client, 'goda', false))
+  assert.deepEqual(check(await pin(a.client, 'village')), ['wala', 'civil', 'village'])
+  const galleryPhoto = check(await a.client.from('canteen_photos')
+    .insert({ canteen_id: adminCanteen, photo_path: path }).select('id').single()).id
+  const timingAndCover = { id: adminCanteen, name, location: 'Updated', opens_minute: 390, closes_minute: 405, primary_photo_id: galleryPhoto }
+  assert.ok((await a.client.rpc('admin_save', { kind: 'canteens', p: timingAndCover })).error)
+  check(await b.client.rpc('admin_save', { kind: 'canteens', p: timingAndCover }))
+  const details = async () => check(await guest.from('canteen_standings')
+    .select('opens_minute, closes_minute, primary_photo_id, primary_photo_path').eq('id', adminCanteen).single())
+  assert.deepEqual(await details(), { opens_minute: 390, closes_minute: 405, primary_photo_id: galleryPhoto, primary_photo_path: path })
+  check(await a.client.from('canteen_photos').delete().eq('id', galleryPhoto))
+  assert.equal((await details()).primary_photo_id, null)
+
   const status = async () => check(await guest.from('canteen_standings')
     .select('reported_closed_until, reported_open_until').eq('id', adminCanteen).single())
+  const report = async () => check(await guest.from('canteen_standings')
+    .select('reported_closed_today_until, last_reported_at, last_reported_status').eq('id', adminCanteen).single())
   assert.ok((await guest.rpc('report_canteen_open', reopenCanteen)).error, 'Guests cannot report reopening')
   check(await a.client.rpc('report_canteen_open', reopenCanteen))
   assert.deepEqual(await status(), { reported_closed_until: null, reported_open_until: null })
@@ -106,10 +159,16 @@ try{
   assert.equal((await status()).reported_closed_until, null, 'The original reporter can clear overlapping closures')
   check(await b.client.rpc('report_canteen_closed_today', reopenCanteen))
   assert.ok((await status()).reported_closed_until, 'A suppressed report can be submitted again for the same day')
+  const dayReport = await report()
+  assert.equal(dayReport.last_reported_status, 'closed')
+  assert.equal(Date.parse(dayReport.reported_closed_today_until), nextColomboMidnight(Date.parse(dayReport.last_reported_at)))
   check(await b.client.rpc('report_canteen_open', reopenCanteen))
   const reopenedAgain = await status()
   assert.equal(reopenedAgain.reported_closed_until, null, 'The student who reported a day-long closure can reopen it')
   assert.ok(reopenedAgain.reported_open_until)
+  const openedReport = await report()
+  assert.equal(openedReport.last_reported_status, 'open')
+  assert.equal(Date.parse(reopenedAgain.reported_open_until) - Date.parse(openedReport.last_reported_at), 60 * 60_000)
   check(await b.client.rpc('withdraw_canteen_closed', reopenCanteen))
   assert.deepEqual(await status(), reopenedAgain, 'Withdrawing affects only the student’s closure')
 
@@ -136,9 +195,10 @@ try{
   assert.equal(check(await b.client.from('posts').select('id').eq('id',post)).length,0)
   post=null;path=null
   check(await b.client.rpc('admin_delete',{kind:'foods',p:{id:food}}));food=null
-  console.log('PASS: upload, non-owner protection, seen privacy, closure and reopening, admin CRUD, weekly vote totals and switching, owner post and storage deletion')
+  console.log('PASS: photo upload and replacement, owner post edits, shared food edits, seen privacy, closure and reopening, personal pins, admin CRUD, weekly vote totals and switching, owner post and storage deletion')
 }finally{
   if(path)await service.storage.from('photos').remove([path])
+  if(replacementPath)await service.storage.from('photos').remove([replacementPath])
   if(post)await service.from('posts').delete().eq('id',post)
   if(food)await service.from('foods').delete().eq('id',food)
   if(adminCanteen)await service.from('canteens').delete().eq('id',adminCanteen)

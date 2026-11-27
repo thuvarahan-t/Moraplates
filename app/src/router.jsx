@@ -5,6 +5,7 @@ import Welcome from './pages/Welcome'
 import Canteens from './pages/Canteens'
 import Canteen from './pages/Canteen'
 import AddCanteen from './pages/AddCanteen'
+import FoodPosts from './pages/FoodPosts'
 import Top from './pages/Top'
 import Profile, { UserProfile } from './pages/Profile'
 import PeoplePage from './pages/PeoplePage'
@@ -21,6 +22,7 @@ export const router = createBrowserRouter([
       { path: 'canteens', element: <Canteens /> },
       { path: 'canteens/new', element: <AddCanteen /> },
       { path: 'canteens/:id', element: <Canteen /> },
+      { path: 'canteens/:id/foods/:foodId', element: <FoodPosts /> },
       { path: 'top', element: <Top /> },
       { path: 'profile', element: <Profile /> },
       { path: 'u/:id', element: <UserProfile /> },

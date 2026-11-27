@@ -13,3 +13,8 @@ export async function shareLink(path, title) {
 }
 
 export const canteenMapLink=c=>c?.lat!=null&&c?.lng!=null?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(c.lat+','+c.lng):'/canteens/'+c?.id
+
+export function canteenDirectionsLink({ lat, lng }) {
+  const params = new URLSearchParams({ api: '1', destination: `${lat},${lng}`, travelmode: 'walking' })
+  return `https://www.google.com/maps/dir/?${params}`
+}

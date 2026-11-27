@@ -19,10 +19,38 @@ export const isReportedOpen = (c, now = Date.now()) => !!c.openUntil && Date.par
 export const isOpen = (c, now = Date.now()) => {
   if (isReportedClosed(c, now)) return false
   if (isReportedOpen(c, now)) return true
-  const h = new Date(now + 330*60_000).getUTCHours()
-  return h >= c.opensAt && h < c.closesAt
+  const local = new Date(now + 330 * 60_000)
+  const minute = local.getUTCHours() * 60 + local.getUTCMinutes()
+  return minute >= Math.round(c.opensAt * 60) && minute < Math.round(c.closesAt * 60)
 }
-export const hourLabel = h => (h === 0 || h === 24 ? '12am' : h === 12 ? '12pm' : h > 12 ? h - 12 + 'pm' : h + 'am')
+export function hourLabel(hour) {
+  const minutes = Math.round(hour * 60) % 1440
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  return `${h % 12 || 12}${m ? ':' + String(m).padStart(2, '0') : ''}${h >= 12 ? 'pm' : 'am'}`
+}
+
+export function canteenStatusLabel(canteen, now = Date.now()) {
+  if (isReportedClosed(canteen, now)) return Date.parse(canteen.closedTodayUntil) > now ? 'Closed today' : 'Closed now'
+  if (isReportedOpen(canteen, now)) return 'Opened'
+  return isOpen(canteen, now) ? 'Open now' : 'Closed'
+}
+
+const reportTime = new Intl.DateTimeFormat('en-LK', {
+  timeZone: 'Asia/Colombo', dateStyle: 'medium', timeStyle: 'short', hour12: true,
+})
+
+export function lastReportLabel(canteen) {
+  const timestamp = Date.parse(canteen.lastReportedAt)
+  if (!Number.isFinite(timestamp)) return null
+  return `Last reported ${canteen.lastReportedStatus} on ${reportTime.format(timestamp)} (Colombo time)`
+}
+
+export function withPrimaryPhoto(canteen, photos) {
+  const primary = canteen.primaryPhoto
+  if (!primary) return photos
+  return [photos.find(photo => photo.id === primary.id) ?? primary, ...photos.filter(photo => photo.id !== primary.id)]
+}
 
 /** Rating chip for a food: [css class, label]. No ratings yet -> neutral chip. */
 export function ratingChip(f) {

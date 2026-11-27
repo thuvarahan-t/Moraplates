@@ -1,0 +1,60 @@
+.admin-schedule,
+.admin-photo-picker {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.admin-schedule legend,
+.admin-photo-picker legend {
+  padding: 0 5px;
+  font-weight: 700;
+}
+
+.admin-schedule-inputs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr));
+  gap: 12px;
+}
+
+.admin-schedule small {
+  color: var(--mut);
+}
+
+.admin-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(90px, 110px));
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.admin-photo-grid button {
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  color: inherit;
+}
+
+.admin-photo-grid button[aria-pressed='true'] {
+  border-color: var(--tom);
+  font-weight: 700;
+}
+
+.admin-photo-grid img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.admin-photo-grid span {
+  display: block;
+  overflow: hidden;
+  padding: 4px 6px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

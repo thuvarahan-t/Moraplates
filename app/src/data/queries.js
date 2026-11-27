@@ -3,15 +3,24 @@ import { supabase } from '../lib/supabase'
 import { photoUrl, uploadPhoto, compressImage } from '../lib/photos'
 import { isMissingSeenSchema, queryWithSeenFallback } from '../lib/optionalSchema'
 import { byVotes } from '../lib/food'
+import { BADGES, isVerifiedProfile } from '../lib/badges'
 
 const need = () => { if (!supabase) throw new Error('This needs a Supabase project. Add keys to .env.') }
 const check = ({ data, error }) => { if (error) throw error; return data }
+const VERIFIED_STATS_FIELDS = ['user_id', ...new Set(BADGES.map(badge => badge.stat))].join(', ')
 
 export const toCanteen = r => ({
   id: r.id, name: r.name, location: r.location, lat: r.lat, lng: r.lng,
-  opensAt: r.opens_at, closesAt: r.closes_at, knownFor: r.known_for, colour: r.colour,
+  opensAt: r.opens_minute == null ? r.opens_at : r.opens_minute / 60,
+  closesAt: r.closes_minute == null ? r.closes_at : r.closes_minute / 60,
+  knownFor: r.known_for, colour: r.colour,
   photo: photoUrl(r.photo_path), votes: r.votes_this_week ?? 0,
-  closedUntil: r.reported_closed_until, openUntil: r.reported_open_until,
+  closedUntil: r.reported_closed_until, openUntil: r.reported_open_until, closedTodayUntil: r.reported_closed_today_until,
+  lastReportedAt: r.last_reported_at, lastReportedStatus: r.last_reported_status,
+  primaryPhoto: r.primary_photo_id ? {
+    id: r.primary_photo_id, canteenId: r.id, userId: r.primary_photo_user_id,
+    path: r.primary_photo_path, url: photoUrl(r.primary_photo_path), by: r.primary_photo_author ?? 'Student',
+  } : null,
 })
 export const toFood = r => ({
   id: r.id, canteenId: r.canteen_id, name: r.name, price: r.price, photo: photoUrl(r.photo_path),
@@ -35,11 +44,11 @@ export function friendly(e) {
 
 // ---------------------------------------------------------------- posts
 
-const POST_FIELDS = 'id, user_id, canteen_id, rating, caption, photo_path, created_at, author:profiles!posts_user_id_fkey(full_name, faculty, avatar_path), food:foods(name, price), likes(count), comments(count)'
-export const POST_READS = ['feed', 'own-profile', 'public-profile', 'post', 'canteen']
+const POST_FIELDS = 'id, user_id, canteen_id, food_id, rating, caption, photo_path, created_at, author:profiles!posts_user_id_fkey(full_name, faculty, avatar_path), food:foods(name, price), likes(count), comments(count)'
+export const POST_READS = ['feed', 'own-profile', 'public-profile', 'post', 'canteen', 'food-posts']
 
-/** Latest posts, optionally for one canteen or one author, with the viewer's likes. */
-export async function fetchPosts(viewerId, { canteenId, authorId, postId, before, unseen = false, limit = 60 } = {}) {
+/** Latest posts, optionally for one canteen, food or author, with the viewer's likes. */
+export async function fetchPosts(viewerId, { canteenId, foodId, authorId, postId, before, unseen = false, limit = 60 } = {}) {
   need()
   const query = includeSeen => {
     let q = supabase.from('posts').select(POST_FIELDS + (includeSeen ? ', seen:post_views()' : '')).order('created_at', { ascending: false }).order('id', { ascending: false }).limit(limit)
@@ -47,24 +56,32 @@ export async function fetchPosts(viewerId, { canteenId, authorId, postId, before
     if (postId) q = q.eq('id', postId)
     if (before) q = q.or('created_at.lt.' + before.createdIso + ',and(created_at.eq.' + before.createdIso + ',id.lt.' + before.id + ')')
     if (canteenId) q = q.eq('canteen_id', canteenId)
+    if (foodId) q = q.eq('food_id', foodId)
     if (authorId) q = q.eq('user_id', authorId)
     return q
   }
   // Keep the actual live posts readable if the seen-history migration is pending.
   // The feed already filters locally remembered post IDs in that case.
   const rows = check(await queryWithSeenFallback(query, !!viewerId && unseen))
-  const mine = new Set(viewerId && rows.length ? check(await supabase.from('likes').select('post_id').eq('user_id', viewerId).in('post_id', rows.map(r => r.id))).map(l => l.post_id) : [])
+  const [likes, badgeStats] = rows.length ? await Promise.all([
+    viewerId ? supabase.from('likes').select('post_id').eq('user_id', viewerId).in('post_id', rows.map(r => r.id)) : { data: [] },
+    supabase.from('profile_stats').select(VERIFIED_STATS_FIELDS).in('user_id', [...new Set(rows.map(r => r.user_id))]),
+  ]) : [{ data: [] }, { data: [] }]
+  const mine = new Set(check(likes).map(l => l.post_id))
+  if (badgeStats.error) console.warn('Post author badges unavailable', badgeStats.error.message)
+  const verified = new Set((badgeStats.data ?? []).filter(isVerifiedProfile).map(r => r.user_id))
   return rows.map(r => ({
     id: r.id,
     userId: r.user_id,
     canteenId: r.canteen_id,
+    foodId: r.food_id,
     rating: r.rating,
     caption: r.caption,
     photo: photoUrl(r.photo_path),
     photoPath: r.photo_path,
     createdIso: r.created_at,
     createdAt: Date.parse(r.created_at),
-    author: { name: r.author?.full_name ?? 'Student', faculty: r.author?.faculty, avatar: photoUrl(r.author?.avatar_path) },
+    author: { name: r.author?.full_name ?? 'Student', faculty: r.author?.faculty, avatar: photoUrl(r.author?.avatar_path), verified: verified.has(r.user_id) },
     food: { name: r.food?.name ?? 'Plate', price: r.food?.price ?? 0 },
     likes: r.likes[0]?.count ?? 0,
     comments: r.comments[0]?.count ?? 0,
@@ -79,18 +96,64 @@ export async function setLike(postId, userId, liked) {
     : await supabase.from('likes').delete().eq('post_id', postId).eq('user_id', userId))
 }
 
+async function removePostPhoto(path) {
+  try {
+    const { error } = await supabase.storage.from('photos').remove([path])
+    return !error
+  } catch {
+    return false
+  }
+}
+
+export async function updateOwnPost(postId, userId, { canteenId, foodId, rating, caption, photo }) {
+  need()
+  const stagedPath = photo ? await uploadPhoto(userId, photo) : null
+  const result = await supabase.rpc('edit_own_post', {
+    target_post: postId,
+    target_canteen: canteenId,
+    target_food: foodId,
+    target_rating: rating,
+    target_caption: caption,
+    target_photo_path: stagedPath,
+  })
+  if (result.error) {
+    // Keep the staged image if a network failure leaves the commit uncertain.
+    const rejected = result.status >= 400 && result.status < 500 &&
+      /^(?:[0-9A-Z]{5}|PGRST\d{3})$/.test(result.error.code ?? '')
+    if (stagedPath && rejected) await removePostPhoto(stagedPath)
+    if (result.error.code === 'PGRST202') throw new Error('Post editing is unavailable right now.')
+    throw result.error
+  }
+  return { photoCleanupFailed: result.data ? !(await removePostPhoto(result.data)) : false }
+}
+
 // ---------------------------------------------------------------- comments
+
+const COMMENT_FIELDS = 'id, user_id, body, created_at, author:profiles!comments_user_id_fkey(full_name, avatar_path)'
+
+const toComment = r => ({
+  id: r.id,
+  parentId: r.parent_id ?? null,
+  userId: r.user_id,
+  body: r.body,
+  createdAt: Date.parse(r.created_at),
+  author: r.author?.full_name ?? 'Student',
+  avatar: photoUrl(r.author?.avatar_path),
+})
 
 export async function fetchComments(postId) {
   need()
-  const rows = check(await supabase.from('comments')
-    .select('id, user_id, body, created_at, author:profiles(full_name, avatar_path)')
-    .eq('post_id', postId).order('created_at'))
-  return rows.map(r => ({ id: r.id, userId: r.user_id, body: r.body, createdAt: Date.parse(r.created_at), author: r.author?.full_name ?? 'Student', avatar: photoUrl(r.author?.avatar_path) }))
+  const read = fields => supabase.from('comments').select(fields).eq('post_id', postId).order('created_at').order('id')
+  const result = await read(COMMENT_FIELDS + ', parent_id')
+  const missingParent = ['42703', 'PGRST204'].includes(result.error?.code) && /\bparent_id\b/i.test(result.error.message)
+  const rows = check(missingParent ? await read(COMMENT_FIELDS) : result)
+  return { list: rows.map(toComment), repliesEnabled: !missingParent }
 }
-export async function addComment(postId, body) {
+export async function addComment(postId, body, parentId) {
   need()
-  check(await supabase.from('comments').insert({ post_id: postId, body }))
+  const payload = { post_id: postId, body, ...(parentId ? { parent_id: parentId } : {}) }
+  const row = check(await supabase.from('comments').insert(payload).select(COMMENT_FIELDS).single())
+  return toComment({ ...row, parent_id: parentId })
 }
 export async function deleteComment(id) {
   need()
@@ -99,6 +162,18 @@ export async function deleteComment(id) {
 }
 
 // ---------------------------------------------------------------- canteens, foods, votes
+
+export async function fetchFoodPageDetails(canteenId, foodId) {
+  // Food IDs are UUIDs in Supabase. A malformed URL refers to no food.
+  if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(foodId)) return null
+  const [canteenResult, foodResult] = await Promise.all([
+    supabase.from('canteen_standings').select('*').eq('id', canteenId).maybeSingle(),
+    supabase.from('food_stats').select('*').eq('canteen_id', canteenId).eq('id', foodId).maybeSingle(),
+  ])
+  const canteen = check(canteenResult)
+  const food = check(foodResult)
+  return canteen && food ? { canteen: toCanteen(canteen), food: toFood(food) } : null
+}
 
 export async function fetchCanteenPage(id, viewerId) {
   need()
@@ -131,6 +206,13 @@ export async function addFood(canteenId, name, price) {
   check(await supabase.from('foods').insert({ canteen_id: canteenId, name, price }))
 }
 
+export async function updateFood(foodId, name, price) {
+  need()
+  const result = await supabase.rpc('update_food', { target_food: foodId, new_name: name, new_price: price })
+  if (result.error?.code === 'PGRST202') throw new Error('Food editing is unavailable right now.')
+  check(result)
+}
+
 /** Creates a canteen; an optional gallery upload must not mask successful creation. */
 export async function addCanteen(userId, { name, location, lat, lng, opensAt, closesAt, knownFor, photo }) {
   need()
@@ -145,11 +227,11 @@ export async function addCanteen(userId, { name, location, lat, lng, opensAt, cl
 // ---------------------------------------------------------------- canteen photos
 
 /** Canteen gallery photos, newest first; one canteen or all of them (home banner). */
-export async function fetchCanteenPhotos(canteenId, limit = 30) {
+export async function fetchCanteenPhotos(canteenId, limit = 30, offset = 0) {
   need()
   let q = supabase.from('canteen_photos')
     .select('id, canteen_id, user_id, photo_path, created_at, author:profiles(full_name)')
-    .order('created_at', { ascending: false }).limit(limit)
+    .order('created_at', { ascending: false }).order('id', { ascending: false }).range(offset, offset + limit - 1)
   if (canteenId) q = q.eq('canteen_id', canteenId)
   return check(await q).map(r => ({
     id: r.id, canteenId: r.canteen_id, userId: r.user_id, path: r.photo_path,
@@ -223,6 +305,21 @@ export async function fetchPublicProfile(userId, viewerId) {
   }
 }
 
+export async function fetchFollowSummary(userId) {
+  need()
+  const result = await supabase.rpc('profile_follow_summary', { target: userId }).single()
+  if (result.error?.code === 'PGRST202') return null
+  return check(result)
+}
+
+export async function setProfileFollow(userId, viewerId, following) {
+  need()
+  const follows = supabase.from('profile_follows')
+  check(following
+    ? await follows.upsert({ followed_id: userId }, { onConflict: 'follower_id,followed_id', ignoreDuplicates: true })
+    : await follows.delete().eq('follower_id', viewerId).eq('followed_id', userId))
+}
+
 /** Uploads a new profile picture and removes the old file. */
 export async function updateAvatar(userId, file, oldPath) {
   need()
@@ -260,7 +357,7 @@ export async function fetchPeople(term = '', excludeId, limit = 12) {
   return check(await q).map(r => ({ id:r.id, name:r.full_name, faculty:r.faculty, batch:r.batch, avatar:photoUrl(r.avatar_path) }))
 }
 const CANTEEN_STATUS_RPC = {
-  closed: 'report_canteen_closed',
+  closed: 'report_canteen_closed_today',
   open: 'report_canteen_open',
 }
 

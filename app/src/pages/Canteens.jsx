@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Share2 } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Pin, Share2 } from 'lucide-react'
 import { shareLink } from '../lib/share'
 import { useFx } from '../lib/fx'
 import { useNavigate } from 'react-router'
@@ -9,10 +9,12 @@ import CanteenThumb, { firstPhotoByCanteen } from '../components/CanteenThumb'
 import Loader from '../components/Loader'
 import { LocationIcon, MapIcon, PlusIcon, SearchIcon } from '../components/icons'
 import { useHomeData } from '../data/useHomeData'
+import { PIN_LIMIT, useCanteenPins } from '../data/useCanteenPins'
 import { useQuery } from '../data/useQuery'
 import { CANTEEN_GALLERY_KEY, fetchCanteenGallery } from '../data/queries'
 import { supabase } from '../lib/supabase'
-import { byVotes, hourLabel, isOpen, isReportedClosed, isReportedOpen, ratingChip, superPercent } from '../lib/food'
+import { byVotes, canteenStatusLabel, hourLabel, isOpen, lastReportLabel, ratingChip, superPercent } from '../lib/food'
+import { tapHaptic } from '../lib/feedback'
 import { useSignInGate } from '../lib/useSignInGate'
 
 const SORTS = [['votes', 'Top voted'], ['open', 'Open now'], ['cheap', 'Cheapest']]
@@ -32,6 +34,8 @@ export default function Canteens() {
   const [showMap, setShowMap] = useState(false)
   const { data: photos } = useQuery(CANTEEN_GALLERY_KEY, fetchCanteenGallery, { enabled: !!supabase })
   const thumbs = firstPhotoByCanteen(photos)
+  const { pins: pinnedIds, setPin, error: pinError, loading: pinsLoading, reload: reloadPins } = useCanteenPins(canteens)
+  const [savingPin, setSavingPin] = useState(false)
 
   const totalVotes = canteens.reduce((total, canteen) => total + canteen.votes, 0)
   const minPrice = c => Math.min(...foods.filter(f => f.canteenId === c.id).map(f => f.price))
@@ -42,8 +46,25 @@ export default function Canteens() {
   let list = sort === 'open' ? canteens.filter(c=>isOpen(c,now)) : [...canteens]
   list.sort(sort === 'cheap' ? (a, b) => (minPrice(a) - minPrice(b)) || 0 : byVotes) // empty menus sort last
   if (term) list = list.filter(c => c.name.toLowerCase().includes(term) || matches.some(f => f.canteenId === c.id))
+  const pinOrder = new Map(pinnedIds.map((id, index) => [id, index]))
+  list.sort((a, b) => (pinOrder.get(a.id) ?? PIN_LIMIT) - (pinOrder.get(b.id) ?? PIN_LIMIT))
 
-  const pins = canteens.filter(c => c.lat != null).map(c => ({ id: c.id, lat: c.lat, lng: c.lng, label: c.name }))
+  const mapPoints = useMemo(() => canteens.filter(c => c.lat != null && c.lng != null)
+    .map(c => ({ id: c.id, lat: c.lat, lng: c.lng, label: c.name })), [canteens])
+
+  async function togglePin(canteen, pinned) {
+    if (savingPin) return
+    setSavingPin(true)
+    try {
+      await setPin(canteen.id, pinned)
+      tapHaptic()
+      toast(pinned ? `${canteen.name} pinned` : `${canteen.name} unpinned`)
+    } catch (error) {
+      toast(error.message?.startsWith('You can pin') ? error.message : "Couldn't update your pins. Try again.")
+    } finally {
+      setSavingPin(false)
+    }
+  }
 
   return (
     <section className="view"><div className="band"><div className="wrap">
@@ -67,12 +88,13 @@ export default function Canteens() {
 
       {showMap && (
         <div className="card mapcard rise">
-          <MapView points={pins} onOpen={id => navigate(`/canteens/${id}`)} />
-          {pins.length < canteens.length && <small>{canteens.length - pins.length} canteens aren't on the map yet. Open one and add its location.</small>}
+          <MapView points={mapPoints} onOpen={id => navigate(`/canteens/${id}`)} />
+          {mapPoints.length < canteens.length && <small>{canteens.length - mapPoints.length} canteens aren't on the map yet. Open one and add its location.</small>}
         </div>
       )}
 
       {loading && <Loader label="Loading canteens" />}
+      {pinError && <div className="canteen-pin-error"><p>Couldn't load your pinned canteens.</p><button type="button" className="mini" onClick={reloadPins}>Retry</button></div>}
       <div className={'clist' + (quiet ? ' noanim' : '')}>
         {matches.length > 0 && (
           <div className="card found rise">
@@ -80,7 +102,7 @@ export default function Canteens() {
             {matches.map(f => {
               const [k, l] = ratingChip(f)
               return (
-                <Link key={f.id} className="frow" to={`/canteens/${f.canteenId}`}>
+                <Link key={f.id} className="frow" to={`/canteens/${f.canteenId}/foods/${f.id}`}>
                   <b>{f.name}</b><span>{nameOf(f.canteenId)} · Rs {f.price}</span><span className={'rt ' + k}>{l}</span>
                 </Link>
               )
@@ -90,7 +112,9 @@ export default function Canteens() {
         {list.map((c, i) => {
           const voteShare = totalVotes ? Math.round((c.votes / totalVotes) * 100) : 0
           const open = isOpen(c,now)
-          const status = isReportedClosed(c, now) ? 'Reported closed' : isReportedOpen(c, now) ? 'Reported open' : open ? 'Open now' : 'Closed'
+          const status = canteenStatusLabel(c, now)
+          const lastReport = lastReportLabel(c)
+          const pinned = pinOrder.has(c.id)
           return (
             <div key={c.id} className="card canteen-list-item rise" style={{ '--i':Math.min(i,4) }}><Link className="ccard" to={`/canteens/${c.id}`} style={{ '--cc': c.colour }}>
               <CanteenThumb canteen={c} photo={thumbs[c.id]} />
@@ -99,12 +123,23 @@ export default function Canteens() {
                 {c.knownFor && <small>Known for {c.knownFor.toLowerCase()}</small>}
                 <small className="loc"><LocationIcon />{c.location}</small>
                 <div><span className={'open ' + (open ? 'y' : 'n')}>{status} · {hourLabel(c.opensAt)} to {hourLabel(c.closesAt)}</span></div>
+                {lastReport && <small><time dateTime={c.lastReportedAt}>{lastReport}</time></small>}
                 <div className="canteen-vote-share">
                   <div className="bar" aria-hidden="true"><i style={{ '--w': `${voteShare}%` }} /></div>
                   <small>{voteShare}%<span className="sr"> of votes</span></small>
                 </div>
               </div>
-            </Link><button className="social-icon canteen-share" aria-label={'Share '+c.name} onClick={async()=>{if(await shareLink('/canteens/'+c.id,c.name+' · MoraPlates')==='copied')toast('Canteen link copied')}}><Share2 size={19}/></button></div>
+            </Link>
+              <div className="canteen-card-actions">
+                <button type="button" className="social-icon canteen-pin" aria-label={`Pin ${c.name}`} aria-pressed={pinned}
+                  title={pinned ? 'Unpin canteen' : 'Pin canteen'} disabled={savingPin || pinsLoading || !!pinError} onClick={() => togglePin(c, !pinned)}>
+                  <Pin size={18} aria-hidden="true" />
+                </button>
+                <button type="button" className="social-icon" aria-label={`Share ${c.name}`} onClick={async () => {
+                  if (await shareLink(`/canteens/${c.id}`, `${c.name} · MoraPlates`) === 'copied') toast('Canteen link copied')
+                }}><Share2 size={19} aria-hidden="true" /></button>
+              </div>
+            </div>
           )
         })}
         {!loading && !list.length && !matches.length && (

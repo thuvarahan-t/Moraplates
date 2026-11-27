@@ -1,11 +1,11 @@
 # MoraPlates
 
 University of Moratuwa students rate canteen food, post what they ate and vote for a favourite canteen.
-React + Vite, Supabase for auth, data and photo storage, Leaflet + OpenStreetMap for maps.
+React + Vite, Supabase for auth, data and photo storage, and Google Maps with a Leaflet/OpenStreetMap fallback.
 Guests can browse everything; posting, liking, commenting, voting, adding canteens, foods and photos need an @uom.lk account.
 
 Features: feed with photo posts, likes and comments · canteen pages with photo slideshows, menus and one-tap voting ·
-home banner of canteen photos · OpenStreetMap pins (students pin canteens that aren't on the map yet) ·
+home slideshow of canteen photos · campus maps (students can add missing locations) ·
 weekly podium and vote board · profiles with photos, stats and badges · a looping "friends eating" loader with food quotes.
 
 `moraplates-handoff/website/index.html` is the visual source of truth. `src/styles/global.css` is its
@@ -19,6 +19,10 @@ npm run dev
 ```
 
 With no Supabase keys the app runs on the sample data from the handoff (`src/data/sample.js`).
+
+## Configure Google Maps
+
+Enable the Maps JavaScript API with billing in Google Cloud. Set `VITE_GOOGLE_MAPS_API_KEY` to a browser key restricted to the app's origins and the Maps JavaScript API. Set `VITE_GOOGLE_MAPS_MAP_ID` to a JavaScript map ID for the deployed app. The app uses Google's demo map ID during local testing when this value is empty. Rebuild after changing these variables. Without a working browser key, interactive maps use OpenStreetMap and canteen directions still open in Google Maps. [Google Maps setup](https://developers.google.com/maps/documentation/javascript/get-api-key)
 
 ## Connect Supabase
 
@@ -53,12 +57,15 @@ With no Supabase keys the app runs on the sample data from the handoff (`src/dat
 - A card becomes seen after at least 40% is visible for 900 ms. The current feed does not remove it mid-scroll. On refresh seen posts are excluded; author profiles retain them, with older-post pagination. Signed-in history is stored privately in `post_views`; guests use a bounded local browser history. The feed's filters and Most liked sorting apply to the loaded pages.
 - Profile search matches public display names, not private email addresses. Feed suggestions list recent public profiles.
 - Photos are cropped client-side with portrait, square or landscape choices, zoom/pan and JPEG export; gallery and avatar crops use fixed ratios.
-- Canteen links and map pins can be shared. Community closure reports last 60 minutes and are labelled as reports, not verified opening hours. The reporter can withdraw their own report; scheduled opening hours are evaluated in Colombo time.
+- Canteen links and map locations can be shared. **Closed today** lasts until Colombo midnight and **Opened** overrides the scheduled hours for up to 60 minutes. The latest report time stays visible after the override expires.
+- Open any menu item to see its posts. Pin up to three canteens to move them to the top of the canteen list. Account pins follow the signed-in user across devices, and guest pins stay in the browser.
+- Signed-in students can reply to comments and follow profiles. Four earned badges unlock the blue tick. The like button and a double-tap on a post give feedback on supported devices. Tall portraits display in a square over a blurred copy.
+- Authors can edit their post's caption, rating, food, canteen and photo. Signed-in students can update any menu item's name and price, keeping existing posts and ratings linked.
 - The admin console is protected by server-side RPC checks against `public.admin_users`. It manages canteens, foods, content moderation, profile display fields, likes, votes, gallery photos and closure reports. It deliberately does not provision login accounts or assign administrator roles from the browser.
 
 ### Deployment order
 
-1. Back up the existing database and test in a separate Supabase project. Apply the two new migrations in filename order (social refresh, admin console) before deploying the frontend. Do not rerun historical destructive migrations on a live database.
+1. Back up the existing database and test in a separate Supabase project. Apply pending migrations in filename order before deploying the frontend, including `20261127130000_community_edits.sql` for post and food edits.
 2. Verify the administrator's existing account identity independently. In the trusted Supabase SQL editor, insert its verified Auth UUID:
    ```sql
    insert into public.admin_users(user_id) values ('<verified-auth-user-uuid>');

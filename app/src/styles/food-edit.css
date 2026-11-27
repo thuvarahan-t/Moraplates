@@ -1,0 +1,24 @@
+.food-edit-dialog {
+  width: min(420px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+}
+
+.food-edit-dialog h2 { font-size: 26px; }
+.food-edit-actions, .food-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.food-edit-actions { justify-content: flex-end; }
+
+.food-menu-actions {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 2px;
+}
+
+@media (max-width: 460px) {
+  .mrow { gap: 8px; }
+  .food-menu-actions .mini { padding-inline: 10px; }
+}
