@@ -10,7 +10,8 @@ const check = ({ data, error }) => { if (error) throw error; return data }
 export const toCanteen = r => ({
   id: r.id, name: r.name, location: r.location, lat: r.lat, lng: r.lng,
   opensAt: r.opens_at, closesAt: r.closes_at, knownFor: r.known_for, colour: r.colour,
-  photo: photoUrl(r.photo_path), votes: r.votes_this_week ?? 0, closedUntil: r.reported_closed_until,
+  photo: photoUrl(r.photo_path), votes: r.votes_this_week ?? 0,
+  closedUntil: r.reported_closed_until, openUntil: r.reported_open_until,
 })
 export const toFood = r => ({
   id: r.id, canteenId: r.canteen_id, name: r.name, price: r.price, photo: photoUrl(r.photo_path),
@@ -258,17 +259,16 @@ export async function fetchPeople(term = '', excludeId, limit = 12) {
   if (clean) q = q.ilike('full_name', '%' + clean + '%')
   return check(await q).map(r => ({ id:r.id, name:r.full_name, faculty:r.faculty, batch:r.batch, avatar:photoUrl(r.avatar_path) }))
 }
-const CLOSURE_RPC = {
-  hour: 'report_canteen_closed',
-  today: 'report_canteen_closed_today',
-  withdraw: 'withdraw_canteen_closed',
+const CANTEEN_STATUS_RPC = {
+  closed: 'report_canteen_closed',
+  open: 'report_canteen_open',
 }
 
-export async function reportClosed(id, action) {
+export async function reportCanteenStatus(id, status) {
   need()
-  const result = await supabase.rpc(CLOSURE_RPC[action], { canteen: id })
-  if (action === 'today' && result.error?.code === 'PGRST202') {
-    throw new Error('Full-day closure reports are unavailable right now.')
+  const result = await supabase.rpc(CANTEEN_STATUS_RPC[status], { canteen: id })
+  if (result.error?.code === 'PGRST202') {
+    throw new Error(status === 'open' ? 'Open reports are unavailable right now.' : 'Closure reporting is unavailable right now.')
   }
   check(result)
 }

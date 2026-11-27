@@ -9,6 +9,8 @@ import { registerPWA } from './lib/pwa'
 import './styles/global.css'
 import './styles/mobile-social.css'
 import './styles/post-dialog.css'
+import './styles/auth-reset.css'
+import './styles/photo-editor.css'
 
 /** Shown instead of a blank page when the deploy's Supabase settings are wrong. */
 function ConfigError({ problem }) {

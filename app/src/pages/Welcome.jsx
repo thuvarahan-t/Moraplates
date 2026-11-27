@@ -2,7 +2,8 @@ import { useRef, useState } from 'react'
 import { Navigate } from 'react-router'
 import { Link } from '../components/NavLinks'
 import PlateScene from '../components/PlateScene'
-import { CameraIcon, ChefHatIcon, EyeIcon, EyeOffIcon, ForkKnifeIcon, SparkIcon, TrophyIcon } from '../components/icons'
+import ForgotPassword from '../components/ForgotPassword'
+import { CameraIcon, ChefHatIcon, ForkKnifeIcon, PasswordPlateIcon, SparkIcon, TrophyIcon } from '../components/icons'
 import { useAuth } from '../lib/auth'
 import { useFx } from '../lib/fx'
 import { ALLOWED_EMAIL_DOMAIN } from '../lib/supabase'
@@ -30,6 +31,7 @@ export default function Welcome() {
   const [showPassword, setShowPassword] = useState(false)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
+  const [forgot, setForgot] = useState(false)
   const tabRefs = useRef({})
 
   if (session) return <Navigate to="/" replace />
@@ -77,6 +79,16 @@ export default function Welcome() {
         </div>
 
         <div className="card auth">
+          {forgot ? (
+            <ForgotPassword initialUser={user}
+              onBack={() => { setForgot(false); setErr('') }}
+              onDone={signedIn => {
+                setForgot(false)
+                setPassword('')
+                setShowPassword(false)
+                toast(signedIn ? 'Password changed. Welcome back!' : 'Password changed. Sign in with your new password.')
+              }} />
+          ) : <>
           <div className="auth-tabs" role="tablist" aria-label="Sign in or create an account" data-mode={mode}>
             <span className="auth-ind" aria-hidden="true" />
             {TABS.map(t => (
@@ -114,14 +126,17 @@ export default function Welcome() {
               </span>
             </label>
             <div className="fl">
-              <label htmlFor="auth-password">Password {up && <em>at least 6 characters</em>}</label>
+              <div className="pw-label">
+                <label htmlFor="auth-password">Password {up && <em>at least 6 characters</em>}</label>
+                {!up && <button type="button" className="linkbtn fp-link" onClick={() => { setForgot(true); setErr('') }}>Forgot password?</button>}
+              </div>
               <div className="password-field">
                 <input id="auth-password" type={showPassword ? 'text' : 'password'}
                   autoComplete={up ? 'new-password' : 'current-password'} autoCapitalize="none" spellCheck={false} value={password}
                   onChange={e => { setPassword(e.target.value); setErr('') }} />
                 <button type="button" aria-controls="auth-password" aria-label={showPassword ? 'Hide password' : 'Show password'}
                   onClick={() => setShowPassword(visible => !visible)}>
-                  {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+                  <PasswordPlateIcon open={showPassword} />
                 </button>
               </div>
             </div>
@@ -135,6 +150,7 @@ export default function Welcome() {
               <button type="button" className="linkbtn" onClick={() => switchTo(up ? 'in' : 'up', true)}>{up ? 'Sign in' : 'Create one'}</button>
             </p>
           </form>
+          </>}
         </div>
 
         <Link className="wl-alt" to="/">Continue as guest</Link>

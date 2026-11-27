@@ -1,0 +1,39 @@
+/* ---------- Forgot password: email → 8-digit code → new password ---------- */
+.pw-label{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.fp-link{font-size:13.5px;font-weight:700;text-decoration:none;color:var(--tomt)}
+.fp-link:hover{text-decoration:underline}
+
+.fp{gap:14px;padding-top:12px}
+.fp-back{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 12px 0 8px;border:0;border-radius:999px;
+  background:var(--chip);color:var(--brand);font-weight:700;font-size:14px;cursor:pointer;transition:transform .25s var(--spring)}
+.fp-back:hover{transform:translateX(-3px)}
+.fp-steps{display:flex;gap:6px;margin:0;padding:0;list-style:none}
+.fp-steps li{flex:1;height:5px;border-radius:9px;background:var(--chip);overflow:hidden;position:relative}
+.fp-steps li::after{content:"";position:absolute;inset:0;background:var(--btn);transform:scaleX(0);transform-origin:left;transition:transform .5s var(--ease)}
+.fp-steps li.done::after,.fp-steps li.now::after{transform:scaleX(1)}
+.fp-steps li.now::after{background:var(--tom)}
+.fp-step{display:flex;flex-direction:column;gap:12px;animation:panelR .45s var(--ease) both}
+.fp-step>.fl{flex:none}
+.fp-ic{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;background:var(--ab);color:var(--at);animation:fpIc .6s var(--spring) both}
+.fp-ic.ok{background:var(--sb);color:var(--st)}
+@keyframes fpIc{from{transform:scale(.4) rotate(-20deg);opacity:0}}
+.fp-mail{color:var(--ink);overflow-wrap:anywhere}
+.fp-wait{font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+.fp .linkbtn:disabled{opacity:.5;cursor:default}
+
+/* code boxes: one transparent input on top of eight boxes */
+.otp{position:relative;display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px;cursor:text}
+.otp-input{position:absolute;inset:0;z-index:1;width:100%;opacity:0;border:0;padding:0;font-size:16px;color:transparent;caret-color:transparent;cursor:text}
+.otp-box{display:grid;place-items:center;aspect-ratio:4/5;max-height:58px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);
+  font:800 clamp(18px,5.4vw,24px)/1 'Bricolage Grotesque',sans-serif;color:var(--brand);font-variant-numeric:tabular-nums;
+  transition:border-color .2s,box-shadow .2s,transform .2s var(--spring)}
+.otp-box.on{border-color:color-mix(in srgb,var(--brand) 45%,var(--line));animation:otpPop .3s var(--spring)}
+@keyframes otpPop{50%{transform:scale(1.12)}}
+.otp:focus-within .otp-box.cur{border-color:var(--tom);box-shadow:0 0 0 4px color-mix(in srgb,var(--tom) 20%,transparent)}
+.otp:focus-within .otp-box.cur:not(.on)::after{content:"";width:2px;height:40%;border-radius:2px;background:var(--tom);animation:otpCaret 1s steps(2) infinite}
+@keyframes otpCaret{50%{opacity:0}}
+.otp.bad{animation:otpShake .45s ease}
+.otp.bad .otp-box{border-color:color-mix(in srgb,var(--tom) 55%,var(--line))}
+@keyframes otpShake{20%{transform:translateX(-8px)}40%{transform:translateX(7px)}60%{transform:translateX(-4px)}80%{transform:translateX(2px)}}
+.otp-input:disabled~.otp-box{opacity:.6}
+@media(max-width:360px){.otp{gap:4px}.otp-box{border-radius:10px}}

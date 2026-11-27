@@ -1,5 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { ALLOWED_EMAIL_DOMAIN, supabase } from './supabase'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { ALLOWED_EMAIL_DOMAIN, createRecoveryClient, supabase } from './supabase'
 import { SAMPLE_ME } from '../data/sample'
 import { photoUrl } from './photos'
 
@@ -16,14 +16,19 @@ export function universityEmail(input) {
   return /^[a-z0-9][a-z0-9._-]{0,63}$/.test(user) ? `${user}@${ALLOWED_EMAIL_DOMAIN}` : null
 }
 
+/** Digits in the password reset code. Must match Supabase → Authentication → Email → "Email OTP length". */
+export const RESET_CODE_LENGTH = 8
+
 /** Supabase auth errors in plain words. */
 function authMessage(e) {
   const m = e?.message ?? ''
   if (/invalid login credentials/i.test(m)) return 'Wrong email or password.'
   if (/email not confirmed/i.test(m)) return 'This account is waiting for email confirmation. Ask the admin to confirm it in Supabase.'
   if (/already registered|already exists/i.test(m)) return 'That email already has an account. Sign in instead.'
+  if (/different from the old password/i.test(m)) return 'Choose a password that is different from your old one.'
   if (/password/i.test(m)) return m
-  if (/rate limit/i.test(m)) return 'Too many tries. Wait a minute and try again.'
+  if (/rate limit|security purposes|only request this after/i.test(m)) return 'Too many tries. Wait a minute and try again.'
+  if (/token.*(expired|invalid)|otp.*(expired|invalid)/i.test(m)) return "That code is wrong or has expired. Check the email, or send a new code."
   return m || 'Something went wrong. Try again.'
 }
 
@@ -32,6 +37,7 @@ export function AuthProvider({ children }) {
   const [loadedProfile, setProfile] = useState(supabase ? null : SAMPLE_ME)
   const [ready, setReady] = useState(!supabase)
   const [tick, setTick] = useState(0)
+  const recovery = useRef(null)
 
   useEffect(() => {
     if (!supabase) return
@@ -58,6 +64,7 @@ export function AuthProvider({ children }) {
   }, [userId, tick])
 
   const refreshProfile = useCallback(() => setTick(t => t + 1), [])
+  const endRecovery = useCallback(() => { recovery.current = null }, [])
 
   const value = useMemo(() => ({
     ready,
@@ -85,10 +92,65 @@ export function AuthProvider({ children }) {
       if (!data.session) return 'Account created, but Supabase is asking for email confirmation. Turn off "Confirm email" in Supabase, then sign in.'
       return null
     },
+    endRecovery,
+    /** Forgot password, step 1: email a one-time code. Says nothing about whether the account exists. */
+    async sendResetCode(username) {
+      const email = universityEmail(username)
+      if (!email) return 'Enter the first part of your university email, like yourname.23'
+      if (!supabase) return 'Password reset needs a Supabase project. Add keys to .env.'
+      const { error } = await supabase.auth.resetPasswordForEmail(email)
+      return error ? authMessage(error) : null
+    },
+    /** Step 2: check the code in a client used only for this reset. */
+    async verifyResetCode(username, code) {
+      const email = universityEmail(username)
+      const token = (code ?? '').replace(/\D/g, '')
+      if (!email) return 'Enter the first part of your university email, like yourname.23'
+      if (token.length !== RESET_CODE_LENGTH) return `Enter the ${RESET_CODE_LENGTH}-digit code from the email.`
+      if (!supabase) return 'Password reset needs a Supabase project. Add keys to .env.'
+      const client = createRecoveryClient()
+      recovery.current = client
+      try {
+        const { data, error } = await client.auth.verifyOtp({ email, token, type: 'recovery' })
+        if (error) throw error
+        if (data.session && recovery.current === client) return null
+        if (recovery.current === client) endRecovery()
+        return 'Start a new password reset to continue.'
+      } catch (error) {
+        if (recovery.current === client) endRecovery()
+        return authMessage(error)
+      }
+    },
+    /** Step 3: save the password, then sign in to the app. */
+    async setNewPassword(password, confirm) {
+      if (password.length < 6) return { error: 'Use at least 6 characters for your password.' }
+      if (password !== confirm) return { error: "The two passwords don't match." }
+      const client = recovery.current
+      if (!client) return { error: 'Start a new password reset to continue.' }
+
+      try {
+        const { error } = await client.auth.updateUser({ password })
+        if (error) return { error: authMessage(error) }
+      } catch (error) {
+        return { error: authMessage(error) }
+      }
+
+      try {
+        const { data } = await client.auth.getSession()
+        if (!data.session || recovery.current !== client) return { signedIn: false }
+        const { access_token, refresh_token } = data.session
+        const result = await supabase.auth.setSession({ access_token, refresh_token })
+        return { signedIn: !!result.data.session }
+      } catch {
+        return { signedIn: false }
+      } finally {
+        if (recovery.current === client) endRecovery()
+      }
+    },
     async signOut() {
       if (supabase) await supabase.auth.signOut()
     },
-  }), [ready, session, profile, refreshProfile])
+  }), [ready, session, profile, refreshProfile, endRecovery])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

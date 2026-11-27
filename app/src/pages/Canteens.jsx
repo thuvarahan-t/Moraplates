@@ -12,7 +12,7 @@ import { useHomeData } from '../data/useHomeData'
 import { useQuery } from '../data/useQuery'
 import { CANTEEN_GALLERY_KEY, fetchCanteenGallery } from '../data/queries'
 import { supabase } from '../lib/supabase'
-import { byVotes, hourLabel, isOpen, isReportedClosed, ratingChip, superPercent } from '../lib/food'
+import { byVotes, hourLabel, isOpen, isReportedClosed, isReportedOpen, ratingChip, superPercent } from '../lib/food'
 import { useSignInGate } from '../lib/useSignInGate'
 import { plural } from '../lib/format'
 
@@ -90,6 +90,7 @@ export default function Canteens() {
         )}
         {list.map((c, i) => {
           const open = isOpen(c,now)
+          const status = isReportedClosed(c, now) ? 'Reported closed' : isReportedOpen(c, now) ? 'Reported open' : open ? 'Open now' : 'Closed'
           return (
             <div key={c.id} className="card canteen-list-item rise" style={{ '--i':Math.min(i,4) }}><Link className="ccard" to={`/canteens/${c.id}`} style={{ '--cc': c.colour }}>
               <CanteenThumb canteen={c} photo={thumbs[c.id]} />
@@ -97,7 +98,7 @@ export default function Canteens() {
                 <div className="row"><span className="cn">{c.name}</span><span className="vt"><b>{c.votes}</b> {c.votes === 1 ? 'vote' : 'votes'}</span></div>
                 {c.knownFor && <small>Known for {c.knownFor.toLowerCase()}</small>}
                 <small className="loc"><LocationIcon />{c.location}</small>
-                <div><span className={'open ' + (open ? 'y' : 'n')}>{isReportedClosed(c,now)?'Reported closed':open ? 'Open now' : 'Closed'} · {hourLabel(c.opensAt)} to {hourLabel(c.closesAt)}</span></div>
+                <div><span className={'open ' + (open ? 'y' : 'n')}>{status} · {hourLabel(c.opensAt)} to {hourLabel(c.closesAt)}</span></div>
                 <div className="bar"><i style={{ '--w': Math.round((c.votes / max) * 100) + '%' }} /></div>
               </div>
             </Link><button className="social-icon canteen-share" aria-label={'Share '+c.name} onClick={async()=>{if(await shareLink('/canteens/'+c.id,c.name+' · MoraPlates')==='copied')toast('Canteen link copied')}}><Share2 size={19}/></button></div>

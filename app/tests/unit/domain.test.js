@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {cropRect} from '../../src/lib/crop.js'
-import {isOpen,isReportedClosed} from '../../src/lib/food.js'
+import {isOpen,isReportedClosed,isReportedOpen} from '../../src/lib/food.js'
 import {applyVote} from '../../src/lib/vote.js'
 import {readSeen,rememberSeen} from '../../src/lib/seen.js'
 
@@ -22,6 +22,16 @@ test('opening hours use Colombo time and temporary reports expire',()=>{
   assert.equal(isReportedClosed(reported,at),true)
   assert.equal(isOpen(reported,at),false)
   assert.equal(isOpen(reported,at+60001),true)
+})
+test('a reopening report overrides scheduled hours until it expires', () => {
+  const afterHours = Date.parse('2026-11-27T12:30:00Z')
+  const expiry = afterHours + 60 * 60_000
+  const canteen = { opensAt: 6, closesAt: 17, openUntil: new Date(expiry).toISOString() }
+  assert.equal(isReportedOpen(canteen, afterHours), true)
+  assert.equal(isOpen(canteen, afterHours), true)
+  assert.equal(isReportedOpen(canteen, expiry), false)
+  assert.equal(isOpen(canteen, expiry), false)
+  assert.equal(isOpen({ ...canteen, closedUntil: canteen.openUntil }, afterHours), false)
 })
 test('switching or removing one vote preserves counts and input',()=>{
   const c=[{id:'a',votes:2},{id:'b',votes:3}]

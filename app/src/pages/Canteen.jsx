@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { Share2, Navigation } from 'lucide-react'
+import { LoaderCircle, Navigation, Share2 } from 'lucide-react'
 import CanteenClosure from '../components/CanteenClosure'
-import CropPhoto from '../components/CropPhoto'
+import { exportPhoto } from '../lib/photoEdit'
 import { shareLink, canteenMapLink } from '../lib/share'
 import { supabase } from '../lib/supabase'
 import { SAMPLE_CANTEENS, SAMPLE_FOODS } from '../data/sample'
@@ -17,7 +17,7 @@ import { BackIcon, CameraIcon, CheckIcon, HeartIcon, MapIcon, PinIcon, TrashIcon
 import Slideshow, { Credit, Dots } from '../components/Slideshow'
 import { useQuery } from '../data/useQuery'
 import { queryKey } from '../data/queryCache'
-import { addCanteenPhoto, addFood, pinCanteen, castVote, deleteCanteenPhoto, fetchCanteenPage, friendly, removeVote, reportClosed } from '../data/queries'
+import { addCanteenPhoto, addFood, pinCanteen, castVote, deleteCanteenPhoto, fetchCanteenPage, friendly, removeVote, reportCanteenStatus } from '../data/queries'
 import { useLikeToggle } from '../data/feed'
 import { useAuth } from '../lib/auth'
 import { centreOf, useFx } from '../lib/fx'
@@ -25,13 +25,7 @@ import { usePost } from '../lib/post'
 import { useSignInGate } from '../lib/useSignInGate'
 import { REDUCED_MOTION } from '../lib/motion'
 import { plural } from '../lib/format'
-import { canteenSuper, hourLabel, isOpen, isReportedClosed, percent, ratingChip, superPercent, totalRatings } from '../lib/food'
-
-const closureConfirmation = {
-  hour: '60-minute closure report submitted',
-  today: 'Closure reported until midnight (Colombo time)',
-  withdraw: 'Your report withdrawn',
-}
+import { canteenSuper, hourLabel, isOpen, isReportedClosed, isReportedOpen, percent, ratingChip, superPercent, totalRatings } from '../lib/food'
 
 /** One canteen: vote, menu, add food, latest plates (renderCanteen() in index.html). */
 export default function Canteen() {
@@ -43,11 +37,11 @@ export default function Canteen() {
   const { openPost, invalidate } = usePost()
   const gate = useSignInGate()
   const voteBtn = useRef(null)
+  const photoInput = useRef(null)
   const [voting, setVoting] = useState(false)
   const [localVote,setLocalVote]=useState(null)
   useEffect(()=>{if(data)setLocalVote({id:data.myVote,votes:data.canteen.votes})},[data])
   const [photoBusy, setPhotoBusy] = useState(false)
-  const [cropFile,setCropFile]=useState(null)
   const [reportBusy,setReportBusy]=useState(false)
   const [now,setNow]=useState(Date.now())
   useEffect(()=>{const t=setInterval(()=>setNow(Date.now()),30_000);return()=>clearInterval(t)},[])
@@ -76,14 +70,18 @@ export default function Canteen() {
   const fav = currentVote === c.id
   const open = isOpen(c,now)
   const reported = isReportedClosed(c,now)
+  const reportedOpen = isReportedOpen(c, now)
+  const status = reported ? 'Reported closed' : reportedOpen ? 'Reported open' : open ? 'Open now' : 'Closed'
+  const directions = c.lat != null && c.lng != null ? canteenMapLink(c) : null
+  const photoActionLabel = photoBusy ? 'Uploading photo…' : 'Add photo'
   const share = async()=>{if(await shareLink('/canteens/'+c.id,c.name+' · MoraPlates')==='copied')toast('Canteen link copied')}
   const closure = async action => {
     if (reportBusy || !gate('to report canteen hours')) return
     setReportBusy(true)
     try {
-      await reportClosed(c.id, action)
+      await reportCanteenStatus(c.id, action)
       setNow(Date.now())
-      toast(closureConfirmation[action])
+      toast(action === 'open' ? 'Canteen reported open' : '60-minute closure report submitted')
       invalidate()
     } catch (e) {
       toast(friendly(e))
@@ -120,11 +118,11 @@ export default function Canteen() {
     }
   }
 
-  const addPhoto = async file => {
-    setCropFile(null)
-    if (!file || !uid) return
+  const addPhoto = async picked => {
+    if (!picked || !uid) return
     setPhotoBusy(true)
     try {
+      const file = await exportPhoto(picked, { fixedAspect: 4 / 3 })
       await addCanteenPhoto(uid, c.id, file)
       toast('Photo added to ' + c.name)
       invalidate()
@@ -146,24 +144,38 @@ export default function Canteen() {
     }
   }
 
+  const closurePanel = <CanteenClosure canteen={c} reported={reported} reportedOpen={reportedOpen} busy={reportBusy} onAction={closure} />
+
   const info = (
     <div className="ctx">
       {c.votes > 0 && <span className="pill">#{rank} this week</span>}
       <h2>{c.name}</h2>
-      <p>{c.location} · <span className={'open ' + (open ? 'y' : 'n')}>{reported ? 'Reported closed' : open ? 'Open now' : 'Closed'}, {hourLabel(c.opensAt)} to {hourLabel(c.closesAt)}</span></p>
+      <p>{c.location} · <span className={'open ' + (open ? 'y' : 'n')}>{status}, {hourLabel(c.opensAt)} to {hourLabel(c.closesAt)}</span></p>
       {c.knownFor && <p>Known for {c.knownFor.toLowerCase()}</p>}
-      <div className="cacts">
+      <div className="cacts canteen-actions">
         <button ref={voteBtn} className={'btn' + (fav ? ' voted' : '')} aria-pressed={fav} onClick={vote} disabled={voting}>
           {fav ? <><CheckIcon />Your favourite canteen</> : <><HeartIcon />Vote as my favourite</>}
         </button>
-        <label className={'btn ghost addph' + (photoBusy ? ' busy' : '')} onClick={e => { if (!gate('to add photos')) e.preventDefault() }}>
-          <CameraIcon size={18} />{photoBusy ? 'Uploading…' : 'Add photo'}
-          <input type="file" accept="image/*" aria-label="Add canteen photo" onChange={e=>{const f=e.target.files?.[0];e.target.value='';if(f)setCropFile(f)}} disabled={photoBusy} hidden />
-        </label>
-        <button className="btn ghost sm" onClick={share}><Share2 size={18}/>Share</button>
-        {c.lat!=null && <><a className="btn ghost sm" href={canteenMapLink(c)} target="_blank" rel="noreferrer"><Navigation size={18}/>Directions</a><button className="btn ghost sm" onClick={async()=>{if(await shareLink(canteenMapLink(c),c.name+' location')==='copied')toast('Location link copied')}}><MapIcon size={18}/>Share location</button></>}
+        <div className="canteen-action-icons" role="group" aria-label="Canteen actions">
+          <button type="button" className="social-icon" aria-label={photoActionLabel} title={photoActionLabel} disabled={photoBusy}
+            onClick={() => { if (gate('to add photos')) photoInput.current?.click() }}>
+            {photoBusy ? <LoaderCircle className="canteen-photo-spinner" size={19} aria-hidden="true" /> : <CameraIcon size={19} />}
+          </button>
+          <input ref={photoInput} type="file" accept="image/*" aria-label="Add canteen photo" disabled={photoBusy} hidden
+            onChange={e => {
+              const file = e.currentTarget.files?.[0]
+              e.currentTarget.value = ''
+              if (file) addPhoto(file)
+            }} />
+          <button type="button" className="social-icon" aria-label="Share" title="Share" onClick={share}>
+            <Share2 size={19} aria-hidden="true" />
+          </button>
+          {directions && <a className="social-icon" href={directions} target="_blank" rel="noreferrer" aria-label="Directions" title="Directions">
+            <Navigation size={19} aria-hidden="true" />
+          </a>}
+        </div>
       </div>
-      <CanteenClosure canteen={c} reported={reported} busy={reportBusy} onAction={closure} />
+      {!photos.length && closurePanel}
     </div>
   )
 
@@ -172,18 +184,21 @@ export default function Canteen() {
       <Back />
       {photos.length ? (
         <div className="cbanner rise">
-          <Slideshow photos={photos}>
-            {(cur, i, goTo) => (
-              <>
-                <Credit name={cur.by} />
-                {cur.userId === uid && (
-                  <button className="gbtn ptrash" onClick={() => deletePhoto(cur)} aria-label="Delete this photo" title="Delete your photo"><TrashIcon /></button>
-                )}
-                <Dots count={photos.length} index={i} goTo={goTo} />
-              </>
-            )}
-          </Slideshow>
+          <div className="cbanner-photo">
+            <Slideshow photos={photos}>
+              {(cur, i, goTo) => (
+                <>
+                  <Credit name={cur.by} />
+                  {cur.userId === uid && (
+                    <button className="gbtn ptrash" onClick={() => deletePhoto(cur)} aria-label="Delete this photo" title="Delete your photo"><TrashIcon /></button>
+                  )}
+                  <Dots count={photos.length} index={i} goTo={goTo} />
+                </>
+              )}
+            </Slideshow>
+          </div>
           {info}
+          <div className="cbanner-report">{closurePanel}</div>
         </div>
       ) : (
         <div className="card chero rise" style={{ '--cc': c.colour }}>
@@ -192,7 +207,6 @@ export default function Canteen() {
         </div>
       )}
 
-      {cropFile && <CropPhoto file={cropFile} fixedAspect={4/3} onCancel={()=>setCropFile(null)} onDone={addPhoto}/>}
       <div className="stats rise" style={{ '--i': 1 }}>
         <div><CountUp to={voteCount} /><span>votes this week</span></div>
         <div><CountUp to={canteenSuper(foods)} suffix="%" /><span>ratings say Super</span></div>
