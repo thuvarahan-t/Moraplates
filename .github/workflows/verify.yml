@@ -1,7 +1,7 @@
 name: MoraPlates verification
 on:
   push:
-    branches: [mobile-social-refresh]
+    branches: [main, mobile-social-refresh]
   pull_request:
     branches: [main]
 permissions:
