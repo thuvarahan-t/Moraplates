@@ -9,9 +9,16 @@ const check = ({ data, error }) => { if (error) throw error; return data }
 
 export const toCanteen = r => ({
   id: r.id, name: r.name, location: r.location, lat: r.lat, lng: r.lng,
-  opensAt: r.opens_at, closesAt: r.closes_at, knownFor: r.known_for, colour: r.colour,
+  opensAt: r.opens_minute == null ? r.opens_at : r.opens_minute / 60,
+  closesAt: r.closes_minute == null ? r.closes_at : r.closes_minute / 60,
+  knownFor: r.known_for, colour: r.colour,
   photo: photoUrl(r.photo_path), votes: r.votes_this_week ?? 0,
-  closedUntil: r.reported_closed_until, openUntil: r.reported_open_until,
+  closedUntil: r.reported_closed_until, openUntil: r.reported_open_until, closedTodayUntil: r.reported_closed_today_until,
+  lastReportedAt: r.last_reported_at, lastReportedStatus: r.last_reported_status,
+  primaryPhoto: r.primary_photo_id ? {
+    id: r.primary_photo_id, canteenId: r.id, userId: r.primary_photo_user_id,
+    path: r.primary_photo_path, url: photoUrl(r.primary_photo_path), by: r.primary_photo_author ?? 'Student',
+  } : null,
 })
 export const toFood = r => ({
   id: r.id, canteenId: r.canteen_id, name: r.name, price: r.price, photo: photoUrl(r.photo_path),
@@ -35,11 +42,11 @@ export function friendly(e) {
 
 // ---------------------------------------------------------------- posts
 
-const POST_FIELDS = 'id, user_id, canteen_id, rating, caption, photo_path, created_at, author:profiles!posts_user_id_fkey(full_name, faculty, avatar_path), food:foods(name, price), likes(count), comments(count)'
-export const POST_READS = ['feed', 'own-profile', 'public-profile', 'post', 'canteen']
+const POST_FIELDS = 'id, user_id, canteen_id, food_id, rating, caption, photo_path, created_at, author:profiles!posts_user_id_fkey(full_name, faculty, avatar_path), food:foods(name, price), likes(count), comments(count)'
+export const POST_READS = ['feed', 'own-profile', 'public-profile', 'post', 'canteen', 'food-posts']
 
-/** Latest posts, optionally for one canteen or one author, with the viewer's likes. */
-export async function fetchPosts(viewerId, { canteenId, authorId, postId, before, unseen = false, limit = 60 } = {}) {
+/** Latest posts, optionally for one canteen, food or author, with the viewer's likes. */
+export async function fetchPosts(viewerId, { canteenId, foodId, authorId, postId, before, unseen = false, limit = 60 } = {}) {
   need()
   const query = includeSeen => {
     let q = supabase.from('posts').select(POST_FIELDS + (includeSeen ? ', seen:post_views()' : '')).order('created_at', { ascending: false }).order('id', { ascending: false }).limit(limit)
@@ -47,6 +54,7 @@ export async function fetchPosts(viewerId, { canteenId, authorId, postId, before
     if (postId) q = q.eq('id', postId)
     if (before) q = q.or('created_at.lt.' + before.createdIso + ',and(created_at.eq.' + before.createdIso + ',id.lt.' + before.id + ')')
     if (canteenId) q = q.eq('canteen_id', canteenId)
+    if (foodId) q = q.eq('food_id', foodId)
     if (authorId) q = q.eq('user_id', authorId)
     return q
   }
@@ -58,6 +66,7 @@ export async function fetchPosts(viewerId, { canteenId, authorId, postId, before
     id: r.id,
     userId: r.user_id,
     canteenId: r.canteen_id,
+    foodId: r.food_id,
     rating: r.rating,
     caption: r.caption,
     photo: photoUrl(r.photo_path),
@@ -100,6 +109,18 @@ export async function deleteComment(id) {
 
 // ---------------------------------------------------------------- canteens, foods, votes
 
+export async function fetchFoodPageDetails(canteenId, foodId) {
+  // Food IDs are UUIDs in Supabase. A malformed URL refers to no food.
+  if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(foodId)) return null
+  const [canteenResult, foodResult] = await Promise.all([
+    supabase.from('canteen_standings').select('*').eq('id', canteenId).maybeSingle(),
+    supabase.from('food_stats').select('*').eq('canteen_id', canteenId).eq('id', foodId).maybeSingle(),
+  ])
+  const canteen = check(canteenResult)
+  const food = check(foodResult)
+  return canteen && food ? { canteen: toCanteen(canteen), food: toFood(food) } : null
+}
+
 export async function fetchCanteenPage(id, viewerId) {
   need()
   const [c, foods, posts, vote, photos] = await Promise.all([
@@ -131,6 +152,13 @@ export async function addFood(canteenId, name, price) {
   check(await supabase.from('foods').insert({ canteen_id: canteenId, name, price }))
 }
 
+export async function updateFood(foodId, name, price) {
+  need()
+  const result = await supabase.rpc('update_food', { target_food: foodId, new_name: name, new_price: price })
+  if (result.error?.code === 'PGRST202') throw new Error('Food editing is unavailable right now.')
+  check(result)
+}
+
 /** Creates a canteen; an optional gallery upload must not mask successful creation. */
 export async function addCanteen(userId, { name, location, lat, lng, opensAt, closesAt, knownFor, photo }) {
   need()
@@ -145,11 +173,11 @@ export async function addCanteen(userId, { name, location, lat, lng, opensAt, cl
 // ---------------------------------------------------------------- canteen photos
 
 /** Canteen gallery photos, newest first; one canteen or all of them (home banner). */
-export async function fetchCanteenPhotos(canteenId, limit = 30) {
+export async function fetchCanteenPhotos(canteenId, limit = 30, offset = 0) {
   need()
   let q = supabase.from('canteen_photos')
     .select('id, canteen_id, user_id, photo_path, created_at, author:profiles(full_name)')
-    .order('created_at', { ascending: false }).limit(limit)
+    .order('created_at', { ascending: false }).order('id', { ascending: false }).range(offset, offset + limit - 1)
   if (canteenId) q = q.eq('canteen_id', canteenId)
   return check(await q).map(r => ({
     id: r.id, canteenId: r.canteen_id, userId: r.user_id, path: r.photo_path,
@@ -260,7 +288,7 @@ export async function fetchPeople(term = '', excludeId, limit = 12) {
   return check(await q).map(r => ({ id:r.id, name:r.full_name, faculty:r.faculty, batch:r.batch, avatar:photoUrl(r.avatar_path) }))
 }
 const CANTEEN_STATUS_RPC = {
-  closed: 'report_canteen_closed',
+  closed: 'report_canteen_closed_today',
   open: 'report_canteen_open',
 }
 

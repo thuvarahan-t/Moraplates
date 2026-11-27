@@ -1,9 +1,39 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import GoogleMap from './GoogleMap'
+import { hasGoogleMaps, loadGoogleMaps, onGoogleAuthFailure } from '../lib/googleMaps'
+import { canteenMapLink } from '../lib/share'
 
 /** University of Moratuwa, Katubedda. */
 export const CAMPUS = [6.7958, 79.9008]
+const GOOGLE_CAMPUS = { lat: CAMPUS[0], lng: CAMPUS[1] }
+const EMPTY_POINTS = []
+
+export default function MapView({ points = EMPTY_POINTS, onOpen, value, onPick, height = 340, zoom = 17 }) {
+  const [sdk, setSdk] = useState(null)
+  const [failed, setFailed] = useState(false)
+  useEffect(() => {
+    if (!hasGoogleMaps) return
+    let live = true
+    const unsubscribe = onGoogleAuthFailure(() => setFailed(true))
+    loadGoogleMaps().then(loaded => { if (live) setSdk(loaded) }, () => { if (live) setFailed(true) })
+    return () => { live = false; unsubscribe() }
+  }, [])
+
+  const props = { points, onOpen, value, onPick, height, zoom }
+  const location = points.length === 1 ? points[0] : GOOGLE_CAMPUS
+
+  return (
+    <>
+      {hasGoogleMaps && !failed ? (sdk
+        ? <GoogleMap sdk={sdk} campus={GOOGLE_CAMPUS} {...props} />
+        : <div className="map map-loading" style={{ height }} role="status">Loading Google Maps…</div>)
+        : <LeafletMap {...props} />}
+      {!onPick && <a className="map-google-link mini" href={canteenMapLink(location)} target="_blank" rel="noreferrer">Open in Google Maps</a>}
+    </>
+  )
+}
 
 // The logo plate as the pin, so we don't depend on Leaflet's default marker images.
 const pin = (big = false) => L.divIcon({
@@ -18,7 +48,7 @@ const pin = (big = false) => L.divIcon({
  *  - points + onOpen: show canteen pins; tapping one calls onOpen(id).
  *  - value + onPick: picker mode; tap the map (or drag the pin) to choose a spot.
  */
-export default function MapView({ points = [], onOpen, value, onPick, height = 340, zoom = 17 }) {
+function LeafletMap({ points, onOpen, value, onPick, height, zoom }) {
   const box = useRef(null)
   const map = useRef(null)
   const layer = useRef(null)

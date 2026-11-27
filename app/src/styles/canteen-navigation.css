@@ -1,0 +1,103 @@
+.brand-wordmark {
+  display: inline-block;
+  animation: wordmark-cycle 6s ease-in-out infinite;
+}
+
+@keyframes wordmark-cycle {
+  0%, 42%, 66%, 100% { transform: translateY(0); }
+  54% { transform: translateY(-2px); }
+}
+
+.bnr-slide { min-height: clamp(190px, 29vw, 265px); }
+.bnr-art { position: absolute; inset: 0; }
+.bnr-art .dish { height: 100%; aspect-ratio: auto; }
+.bnr-art .dish i { width: clamp(116px, 27%, 176px); }
+.bnr-play {
+  position: absolute;
+  z-index: 4;
+  top: 10px;
+  right: 10px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #221b1abc;
+  color: white;
+  cursor: pointer;
+}
+.bnr > .dots {
+  gap: 0;
+  bottom: 9px;
+  right: 9px;
+  max-width: calc(100% - 18px);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.bnr > .dots button {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  background: transparent;
+}
+.bnr > .dots button:focus-visible { outline-offset: -3px; }
+.bnr > .dots button::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 8px;
+  background: #fff4e4a0;
+  transition: width .25s ease;
+}
+.bnr > .dots button.on::after { width: 18px; background: #fff4e4; }
+.bnr-txt { padding-bottom: 34px; }
+.bnr-slide:focus-visible { outline-offset: -4px; }
+
+.canteen-card-actions {
+  display: grid;
+  flex: 0 0 auto;
+  margin-inline-end: 7px;
+}
+.canteen-pin[aria-pressed="true"] { color: var(--brand); background: var(--chip); }
+.canteen-pin[aria-pressed="true"] svg { fill: color-mix(in srgb, var(--brand) 22%, transparent); }
+.canteen-pin-error { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+.food-post-link { color: inherit; text-decoration: none; }
+.food-post-link:hover b, .food-post-link:focus-visible b { text-decoration: underline; }
+.food-plates-heading h1 { font-size: clamp(25px, 5vw, 36px); }
+
+.map-loading { display: grid; place-items: center; color: var(--mut); }
+.map-google-link { align-self: flex-start; margin-inline-start: 4px; text-decoration: none; }
+
+@media (max-width: 760px) {
+  .bnav a {
+    position: relative;
+    z-index: 1;
+    touch-action: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .bnav .plus { position: relative; z-index: 1; }
+  .bnav.is-dragging a[aria-current] { background: transparent; box-shadow: none; color: var(--mut); }
+  .bnav.is-dragging a[data-preview] { color: var(--brand); }
+  .bnav-drag-pill {
+    position: absolute;
+    inset: 6px auto 6px 0;
+    width: var(--nav-drag-width);
+    transform: translateX(var(--nav-drag-x));
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--brand) 15%, white);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 26%, transparent);
+    pointer-events: none;
+    transition: transform 75ms linear, width 100ms ease-out;
+  }
+  .canteen-card-actions { margin-inline-end: 2px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-wordmark { animation: none; }
+  .bnav-drag-pill, .bnr > .dots button::after { transition: none; }
+}

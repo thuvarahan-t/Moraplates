@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { LoaderCircle, Navigation, Share2 } from 'lucide-react'
 import CanteenClosure from '../components/CanteenClosure'
 import { exportPhoto } from '../lib/photoEdit'
-import { shareLink, canteenMapLink } from '../lib/share'
+import { shareLink, canteenDirectionsLink } from '../lib/share'
 import { supabase } from '../lib/supabase'
 import { SAMPLE_CANTEENS, SAMPLE_FOODS } from '../data/sample'
 import { samplePosts } from '../data/feed'
@@ -11,6 +11,7 @@ import { Link } from '../components/NavLinks'
 import CountUp from '../components/CountUp'
 import Loader from '../components/Loader'
 import Dish from '../components/Dish'
+import EditFoodButton from '../components/EditFoodButton'
 import MapView, { locate } from '../components/MapView'
 import PostCard from '../components/PostCard'
 import { BackIcon, CameraIcon, CheckIcon, HeartIcon, MapIcon, PinIcon, TrashIcon } from '../components/icons'
@@ -20,12 +21,13 @@ import { queryKey } from '../data/queryCache'
 import { addCanteenPhoto, addFood, pinCanteen, castVote, deleteCanteenPhoto, fetchCanteenPage, friendly, removeVote, reportCanteenStatus } from '../data/queries'
 import { useLikeToggle } from '../data/feed'
 import { useAuth } from '../lib/auth'
+import { tapHaptic } from '../lib/feedback'
 import { centreOf, useFx } from '../lib/fx'
 import { usePost } from '../lib/post'
 import { useSignInGate } from '../lib/useSignInGate'
 import { REDUCED_MOTION } from '../lib/motion'
 import { plural } from '../lib/format'
-import { canteenSuper, hourLabel, isOpen, isReportedClosed, isReportedOpen, percent, ratingChip, superPercent, totalRatings } from '../lib/food'
+import { canteenStatusLabel, canteenSuper, hourLabel, isOpen, percent, ratingChip, superPercent, totalRatings, withPrimaryPhoto } from '../lib/food'
 
 /** One canteen: vote, menu, add food, latest plates (renderCanteen() in index.html). */
 export default function Canteen() {
@@ -63,16 +65,15 @@ export default function Canteen() {
     )
   }
 
-  const { canteen: c, rank, foods, myVote, photos } = data
+  const { canteen: c, rank, foods, myVote } = data
+  const photos = withPrimaryPhoto(c, data.photos)
   const menu = [...foods].sort((a, b) => superPercent(b) - superPercent(a) || totalRatings(b) - totalRatings(a))
   const currentVote=localVote?localVote.id:myVote
   const voteCount=localVote?.votes??c.votes
   const fav = currentVote === c.id
   const open = isOpen(c,now)
-  const reported = isReportedClosed(c,now)
-  const reportedOpen = isReportedOpen(c, now)
-  const status = reported ? 'Reported closed' : reportedOpen ? 'Reported open' : open ? 'Open now' : 'Closed'
-  const directions = c.lat != null && c.lng != null ? canteenMapLink(c) : null
+  const status = canteenStatusLabel(c, now)
+  const directions = c.lat != null && c.lng != null ? canteenDirectionsLink(c) : null
   const photoActionLabel = photoBusy ? 'Uploading photo…' : 'Add photo'
   const share = async()=>{if(await shareLink('/canteens/'+c.id,c.name+' · MoraPlates')==='copied')toast('Canteen link copied')}
   const closure = async action => {
@@ -80,8 +81,9 @@ export default function Canteen() {
     setReportBusy(true)
     try {
       await reportCanteenStatus(c.id, action)
+      tapHaptic()
       setNow(Date.now())
-      toast(action === 'open' ? 'Canteen reported open' : '60-minute closure report submitted')
+      toast(action === 'open' ? 'Canteen reported opened' : 'Canteen reported closed today')
       invalidate()
     } catch (e) {
       toast(friendly(e))
@@ -148,7 +150,7 @@ export default function Canteen() {
     }
   }
 
-  const closurePanel = <CanteenClosure canteen={c} reported={reported} reportedOpen={reportedOpen} busy={reportBusy} onAction={closure} />
+  const closurePanel = <CanteenClosure canteen={c} now={now} busy={reportBusy} onAction={closure} />
 
   const info = (
     <div className="ctx">
@@ -197,7 +199,7 @@ export default function Canteen() {
       {photos.length ? (
         <div className="cbanner rise">
           <div className="cbanner-photo">
-            <Slideshow photos={photos}>
+            <Slideshow key={c.primaryPhoto?.id ?? c.id} photos={photos}>
               {(cur, i, goTo) => (
                 <>
                   <Credit name={cur.by} />
@@ -241,7 +243,7 @@ export default function Canteen() {
             const [k, l] = ratingChip(f)
             return (
               <div className="mrow" key={f.id}>
-                <div className="mi">
+                <Link className="mi food-post-link" to={`/canteens/${c.id}/foods/${f.id}`}>
                   <b>{f.name}</b>
                   <small>Rs {f.price} · {plural(totalRatings(f), 'rating')}</small>
                   <div className="s3" aria-hidden="true">
@@ -249,9 +251,12 @@ export default function Canteen() {
                     <i className="o" style={{ '--w': percent(f, 'okayCount') + '%' }} />
                     <i className="a" style={{ '--w': percent(f, 'avoidCount') + '%' }} />
                   </div>
-                </div>
+                </Link>
                 <span className={'rt ' + k}>{l}</span>
-                <button className="mini" onClick={() => openPost(c.id, f.id)} aria-label={`Post a plate of ${f.name}`}>Post</button>
+                <div className="food-menu-actions">
+                  <EditFoodButton food={f} iconOnly />
+                  <button className="mini" onClick={() => openPost(c.id, f.id)} aria-label={`Post a plate of ${f.name}`}>Post</button>
+                </div>
               </div>
             )
           })}

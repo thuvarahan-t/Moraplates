@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {cropRect} from '../../src/lib/crop.js'
-import {isOpen,isReportedClosed,isReportedOpen} from '../../src/lib/food.js'
+import {canteenStatusLabel,hourLabel,isOpen,isReportedClosed,isReportedOpen,lastReportLabel,withPrimaryPhoto} from '../../src/lib/food.js'
 import {applyVote} from '../../src/lib/vote.js'
 import {readSeen,rememberSeen} from '../../src/lib/seen.js'
 
@@ -32,6 +32,32 @@ test('a reopening report overrides scheduled hours until it expires', () => {
   assert.equal(isReportedOpen(canteen, expiry), false)
   assert.equal(isOpen(canteen, expiry), false)
   assert.equal(isOpen({ ...canteen, closedUntil: canteen.openUntil }, afterHours), false)
+})
+test('custom canteen schedules start and end on their configured minute', () => {
+  const canteen = { opensAt: 6.5, closesAt: 6.75 }
+  const at = time => Date.parse(`2026-11-27T${time}Z`)
+  assert.equal(isOpen(canteen, at('00:59:00')), false)
+  assert.equal(isOpen(canteen, at('01:00:00')), true)
+  assert.equal(isOpen(canteen, at('01:15:00')), false)
+  assert.equal(hourLabel(canteen.opensAt), '6:30am')
+})
+test('day-long closure and reopening labels show the latest report in Colombo time', () => {
+  const report = '2026-11-27T01:00:00Z'
+  const end = '2026-11-27T18:30:00Z'
+  const now = Date.parse(report)
+  const closed = { opensAt: 6, closesAt: 17, closedUntil: end, closedTodayUntil: end, lastReportedStatus: 'closed', lastReportedAt: report }
+  assert.equal(canteenStatusLabel(closed, now), 'Closed today')
+  assert.match(lastReportLabel(closed), /Last reported closed on .*6:30.*Colombo time/)
+  assert.equal(canteenStatusLabel(closed, Date.parse(end)), 'Closed')
+  const opened = { opensAt: 6, closesAt: 17, openUntil: end, lastReportedStatus: 'open', lastReportedAt: report }
+  assert.equal(canteenStatusLabel(opened, now), 'Opened')
+  assert.match(lastReportLabel(opened), /Last reported open on .*6:30.*Colombo time/)
+})
+test('the primary photo leads a canteen gallery even when omitted from the newest photos', () => {
+  const primaryPhoto = { id: 'selected' }
+  const recent = { id: 'recent' }
+  assert.deepEqual(withPrimaryPhoto({ primaryPhoto }, [recent]), [primaryPhoto, recent])
+  assert.deepEqual(withPrimaryPhoto({ primaryPhoto }, [recent, primaryPhoto]), [primaryPhoto, recent])
 })
 test('switching or removing one vote preserves counts and input',()=>{
   const c=[{id:'a',votes:2},{id:'b',votes:3}]

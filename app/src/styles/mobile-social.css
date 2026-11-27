@@ -84,7 +84,6 @@ input,textarea,select{font-size:16px!important}
 .pick img{object-fit:contain;background:var(--soft)}
 .canteen-list-item{display:flex;align-items:center;overflow:hidden}
 .canteen-list-item .ccard{flex:1;min-width:0}
-.canteen-share{margin-right:8px}
 .canteen-photo-placeholder{display:grid}
 .canteen-photo-placeholder > *{grid-area:1 / 1}
 .canteen-photo-placeholder .dish{height:100%}
@@ -203,7 +202,6 @@ input,textarea,select{font-size:16px!important}
   .bnav::before{display:none}
   .canteen-list-item .ccard{padding:12px;gap:10px}
   .canteen-list-item .cthumb{max-width:78px}
-  .canteen-share{margin-right:2px}
   .vh{align-items:flex-start;margin-bottom:14px}
   .vrow{padding:8px;gap:6px}
   .vrow .btn{padding:0 12px}

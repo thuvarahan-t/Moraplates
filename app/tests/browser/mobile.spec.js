@@ -16,9 +16,9 @@ test('all demo routes render in light mode without page errors or horizontal ove
 test('canteen details offer one inline closure report on mobile', async ({ page }) => {
   await page.goto('/canteens/it')
   const closure = page.locator('.closure-box')
-  await expect(closure.getByText('Report a temporary closure for 60 minutes.')).toBeVisible()
+  await expect(closure.getByText('Help students plan their visit with a closure report.')).toBeVisible()
   await expect(closure.getByRole('button')).toHaveCount(1)
-  await expect(closure.getByRole('button', { name: 'Report closed', exact: true })).toBeVisible()
+  await expect(closure.getByRole('button', { name: 'Report closed today', exact: true })).toBeVisible()
 })
 
 test('feed likes, shares and seen history; a viewed plate remains on author profile',async({page})=>{
