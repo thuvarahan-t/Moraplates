@@ -33,6 +33,13 @@
 - [x] Run all 21 Chromium browser tests and exercise signed-in flows and Google Maps with local API fixtures.
 - [x] Verify the migration chain, authorization and write behavior in disposable PostgreSQL with Supabase auth and storage stand-ins.
 
+## Slideshow and mobile tab refinements
+
+- [x] Show only canteens with photos in the home slideshow, using up to five recent photos per canteen.
+- [x] Advance automatically and use side arrows and swipe navigation for manual browsing.
+- [x] Animate the active highlight between mobile tabs, including after drag and release.
+- [x] Verify both refinements with 24 unit tests, 22 Chromium tests, a photo-gallery fixture and a production build.
+
 ## Production rollout
 
 - [x] Back up and verify the live Supabase public schema before applying the release.

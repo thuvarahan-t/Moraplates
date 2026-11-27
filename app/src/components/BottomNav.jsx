@@ -1,5 +1,5 @@
-import { Fragment, useEffect, useRef, useState } from 'react'
-import { NavLink, useNavigate } from 'react-router'
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { NavLink, useLocation, useNavigate } from 'react-router'
 import { FeedIcon, PlusIcon, StoreIcon, TrophyIcon, UserIcon } from './icons'
 import { tapHaptic } from '../lib/feedback'
 import { usePost } from '../lib/post'
@@ -13,14 +13,40 @@ const TABS = [
 const HOLD_MS = 230
 const MOVE_THRESHOLD = 9
 
+function placePill(nav, left, width) {
+  nav.style.setProperty('--nav-pill-x', `${left}px`)
+  nav.style.setProperty('--nav-pill-width', `${width}px`)
+}
+
+function placeActivePill(nav) {
+  const active = nav.querySelector('a[aria-current="page"]')
+  if (active) placePill(nav, active.offsetLeft, active.offsetWidth)
+}
+
 export default function BottomNav() {
   const { openPost } = usePost()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
+  const bar = useRef(null)
   const gesture = useRef(null)
   const suppressClick = useRef(false)
   const [preview, setPreview] = useState(null)
 
-  useEffect(() => () => clearTimeout(gesture.current?.timer), [])
+  useLayoutEffect(() => {
+    if (!gesture.current?.active) placeActivePill(bar.current)
+  }, [pathname])
+
+  useEffect(() => {
+    const nav = bar.current
+    const observer = new ResizeObserver(() => {
+      if (!gesture.current?.active) placeActivePill(nav)
+    })
+    observer.observe(nav)
+    return () => {
+      observer.disconnect()
+      clearTimeout(gesture.current?.timer)
+    }
+  }, [])
 
   function start(event) {
     if (!event.isPrimary || event.button !== 0 || gesture.current) return
@@ -44,8 +70,7 @@ export default function BottomNav() {
       hold.active = true
       suppressClick.current = true
       nav.setPointerCapture(hold.id)
-      nav.style.setProperty('--nav-drag-x', `${first.center - first.width / 2}px`)
-      nav.style.setProperty('--nav-drag-width', `${first.width}px`)
+      placePill(nav, first.center - first.width / 2, first.width)
       tapHaptic()
       setPreview(first.path)
     }, HOLD_MS)
@@ -66,8 +91,7 @@ export default function BottomNav() {
     const x = Math.max(first, Math.min(last, event.clientX - hold.left + hold.offset))
     const next = hold.tabs.reduce((closest, tab) =>
       Math.abs(tab.center - x) < Math.abs(closest.center - x) ? tab : closest)
-    nav.style.setProperty('--nav-drag-x', `${x - next.width / 2}px`)
-    nav.style.setProperty('--nav-drag-width', `${next.width}px`)
+    placePill(nav, x - next.width / 2, next.width)
     if (Math.abs(dx) > MOVE_THRESHOLD) hold.moved = true
     if (hold.target !== next.path) {
       hold.target = next.path
@@ -83,15 +107,19 @@ export default function BottomNav() {
     gesture.current = null
     if (!hold.active) return
     setPreview(null)
-    const rect = event.currentTarget.getBoundingClientRect()
+    const nav = event.currentTarget
+    const rect = nav.getBoundingClientRect()
     if (select && hold.moved && event.clientY >= rect.top - 48 && event.clientY <= rect.bottom + 24) {
-      const currentTab = event.currentTarget.querySelector('a[aria-current="page"]')?.dataset.tab
-      if (currentTab !== hold.target) navigate(hold.target)
+      const target = hold.tabs.find(tab => tab.path === hold.target)
+      placePill(nav, target.center - target.width / 2, target.width)
+      if (nav.querySelector('a[aria-current="page"]')?.dataset.tab !== target.path) navigate(target.path)
+    } else {
+      placeActivePill(nav)
     }
   }
 
   return (
-    <nav className={preview ? 'bnav is-dragging' : 'bnav'} aria-label="Main"
+    <nav ref={bar} className={preview ? 'bnav is-dragging' : 'bnav'} aria-label="Main"
       onPointerDown={start} onPointerMove={move} onPointerUp={event => finish(event, true)}
       onPointerLeave={event => { if (!gesture.current?.active) finish(event, false) }}
       onPointerCancel={event => finish(event, false)}
@@ -103,7 +131,7 @@ export default function BottomNav() {
         event.stopPropagation()
         suppressClick.current = false
       }}>
-      {preview && <span className="bnav-drag-pill" aria-hidden="true" />}
+      <span className="bnav-pill" aria-hidden="true" />
       {TABS.map(({ path, label, icon: Icon }) => (
         <Fragment key={path}>
           {path === '/top' && <button type="button" className="plus" onClick={openPost} aria-label="Post your plate">
