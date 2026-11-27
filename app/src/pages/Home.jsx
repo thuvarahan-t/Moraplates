@@ -1,6 +1,6 @@
 import { Link } from '../components/NavLinks'
 import FeedSection from '../components/FeedSection'
-import HomeBanner from '../components/HomeBanner'
+import People from '../components/People'
 import { ChevronIcon, FlameIcon } from '../components/icons'
 import { useHomeData } from '../data/useHomeData'
 import { superPercent, totalRatings } from '../lib/food'
@@ -30,8 +30,10 @@ export default function Home() {
             </Link>
           )}
         </div>
-        <HomeBanner canteens={canteens} />
-        <FeedSection canteens={canteens} />
+        <div className="social-layout">
+          <div><FeedSection canteens={canteens} /></div>
+          <aside className="social-aside"><People compact /></aside>
+        </div>
       </div></div>
     </section>
   )

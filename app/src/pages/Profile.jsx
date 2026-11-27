@@ -1,4 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import People from '../components/People'
+import CropPhoto from '../components/CropPhoto'
+import { useAdmin } from '../lib/useAdmin'
+import { samplePosts } from '../data/feed'
 import { Navigate, useNavigate, useParams } from 'react-router'
 import { Link } from '../components/NavLinks'
 import Avatar from '../components/Avatar'
@@ -13,7 +17,7 @@ import { RATING } from '../lib/format'
 import { usePost } from '../lib/post'
 import { supabase } from '../lib/supabase'
 import { useQuery } from '../data/useQuery'
-import { fetchProfilePage, fetchPublicProfile, friendly, updateAvatar, updateProfile } from '../data/queries'
+import { fetchPosts, fetchProfilePage, fetchPublicProfile, friendly, updateAvatar, updateProfile } from '../data/queries'
 
 const TONES = { leaf: ['var(--sb)', 'var(--st)'], mus: ['var(--ob)', 'var(--ot)'], tom: ['var(--ab)', 'var(--at)'] }
 
@@ -25,6 +29,7 @@ export default function Profile() {
   if (!supabase || !session) {
     return (
       <section className="view"><div className="band"><div className="wrap narrow">
+        <People searchOnly />
         <div className="card empty rise">
           <h3>You're browsing as a guest</h3>
           <p>Sign in with your university email to post plates, vote and collect badges.</p>
@@ -42,7 +47,7 @@ export function UserProfile() {
   const { id } = useParams()
   const { session } = useAuth()
   const uid = session?.user?.id
-  const { data, error, loading } = useQuery(() => fetchPublicProfile(id, uid), [id, uid])
+  const { data, error, loading } = useQuery(() => supabase ? fetchPublicProfile(id, uid) : Promise.resolve((() => { const posts=samplePosts().filter(p=>p.userId===id); const a=posts[0]?.author; return a ? {profile:{id,fullName:a.name,faculty:a.faculty},stats:{plates:posts.length},posts} : null })()), [id, uid])
 
   if (uid && id === uid) return <Navigate to="/profile" replace />
   if (loading && !data) return <section className="view"><Loader label="Loading profile" /></section>
@@ -56,7 +61,9 @@ export function UserProfile() {
   const p = data.profile
   return (
     <ProfileBody
-      top={<button className="back linkish" onClick={() => history.back()}><BackIcon />Back</button>}
+      top={<Link className="back" to="/people"><BackIcon />Find foodies</Link>}
+      authorId={id}
+      viewerId={uid}
       head={<>
         <Avatar name={p.fullName} url={p.avatar} />
         <div className="who"><b>{p.fullName}</b><span style={{ color: 'var(--mut)' }}>{[p.faculty, p.batch].filter(Boolean).join(' · ') || 'Mora student'}</span></div>
@@ -71,6 +78,7 @@ export function UserProfile() {
 
 function OwnProfile({ uid, email, profile }) {
   const { signOut, refreshProfile } = useAuth()
+  const admin=useAdmin()
   const { openPost } = usePost()
   const { toast } = useFx()
   const navigate = useNavigate()
@@ -79,16 +87,16 @@ function OwnProfile({ uid, email, profile }) {
     toast('Signed out. See you at lunch!')
     navigate('/welcome')
   }
-  const { data } = useQuery(() => fetchProfilePage(uid), [uid])
+  const { data, error, reload } = useQuery(() => fetchProfilePage(uid), [uid])
   const [editing, setEditing] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [cropFile,setCropFile]=useState(null)
   // New accounts start with the email name ("thuvarahant.23"); nudge them to set a real one.
   const needsName = profile.fullName === email.split('@')[0]
   const sub = [profile.faculty, profile.batch].filter(Boolean).join(' · ') || email
 
-  const pickAvatar = async e => {
-    const file = e.target.files?.[0]
-    e.target.value = ''
+  const pickAvatar = async file => {
+    setCropFile(null)
     if (!file) return
     setUploading(true)
     try {
@@ -102,6 +110,7 @@ function OwnProfile({ uid, email, profile }) {
     }
   }
 
+  if (error) return <section className="view"><div className="card empty"><h3>Couldn't load your profile</h3><button className="btn sm" onClick={reload}>Retry</button></div></section>
   if (!data) return <section className="view"><Loader label="Loading your profile" /></section>
   return (
     <ProfileBody
@@ -109,7 +118,7 @@ function OwnProfile({ uid, email, profile }) {
         <label className={'avpick' + (uploading ? ' busy' : '')} title="Change profile photo">
           <Avatar name={profile.fullName} url={profile.avatar} />
           <span className="avcam" aria-hidden="true"><CameraIcon size={16} /></span>
-          <input type="file" accept="image/*" onChange={pickAvatar} disabled={uploading} aria-label="Change profile photo" hidden />
+          <input type="file" accept="image/*" onChange={e=>{const f=e.target.files?.[0];e.target.value='';if(f)setCropFile(f)}} disabled={uploading} aria-label="Change profile photo" hidden />
         </label>
         <div className="who"><b>{profile.fullName}</b><span style={{ color: 'var(--mut)' }}>{uploading ? 'Uploading photo…' : sub}</span></div>
         <div className="pro-acts">
@@ -117,7 +126,7 @@ function OwnProfile({ uid, email, profile }) {
           <button className="btn sm" onClick={() => openPost()}>Post your plate</button>
         </div>
       </>}
-      below={(editing || needsName) && <EditProfile uid={uid} profile={profile} onDone={() => setEditing(false)} />}
+      below={<>{cropFile && <CropPhoto file={cropFile} fixedAspect={1} max={600} onCancel={()=>setCropFile(null)} onDone={pickAvatar}/>} {(editing || needsName) && <EditProfile uid={uid} profile={profile} onDone={() => setEditing(false)} />}</>}
       extra={data?.favCanteen ? (
         <Link className="card ccard rise tilt" to={`/canteens/${data.favCanteen.id}`} style={{ '--i': 2, boxShadow: 'inset 0 0 0 2px var(--leaf)' }}>
           <span className="rank" style={{ background: 'var(--sb)', color: 'var(--st)' }}><HeartIcon /></span>
@@ -131,20 +140,34 @@ function OwnProfile({ uid, email, profile }) {
         </Link>
       )}
       stats={data?.stats}
+      authorId={uid}
+      viewerId={uid}
       posts={data?.posts}
       platesTitle="Your plates"
       emptyPlates="No plates yet. Tap + to post your first one."
-      after={<button className="btn ghost sm signout" onClick={leave}><LogOutIcon />Sign out</button>}
+      after={<div className="cacts">{admin.allowed&&<Link className="btn sm" to="/admin">Admin console</Link>}<button className="btn ghost sm signout" onClick={leave}><LogOutIcon />Sign out</button></div>}
     />
   )
 }
 
 /** Layout shared by your own profile and other students' profiles. */
-function ProfileBody({ top, head, below, extra, stats: s, posts, platesTitle, emptyPlates, after }) {
+function ProfileBody({ top, head, below, extra, stats: s, posts, authorId, viewerId, platesTitle, emptyPlates, after }) {
   const badges = badgesFor(s)
+  const {toast}=useFx()
+  const [older,setOlder]=useState([])
+  const [hasMore,setHasMore]=useState(false)
+  const [busy,setBusy]=useState(false)
+  useEffect(()=>{setOlder([]);setHasMore(!!supabase&&posts?.length===60)},[posts])
+  const all=[...(posts??[]),...older]
+  const loadOlder=async()=>{
+    if(busy||!hasMore||!all.length)return
+    setBusy(true)
+    try{const rows=await fetchPosts(viewerId,{authorId,before:all.at(-1),limit:60});setOlder(old=>[...old,...rows.filter(r=>!all.some(p=>p.id===r.id))]);setHasMore(rows.length===60)}catch(e){toast(friendly(e))}finally{setBusy(false)}
+  }
   return (
     <section className="view"><div className="band"><div className="wrap">
       {top}
+      <People searchOnly />
       <div className="card pro rise">{head}</div>
       {below}
 
@@ -172,16 +195,17 @@ function ProfileBody({ top, head, below, extra, stats: s, posts, platesTitle, em
 
       <h3 className="sec">{platesTitle}</h3>
       <div className="mine">
-        {posts?.map((p, i) => {
+        {all.map((p, i) => {
           const [rl, rc] = RATING[p.rating]
           return (
-            <Link key={p.id} className="card rise tilt" to={`/canteens/${p.canteenId}`} style={{ '--i': i, textDecoration: 'none', color: 'inherit' }}>
+            <Link key={p.id} className="card rise tilt" to={`/posts/${p.id}`} style={{ '--i': i, textDecoration: 'none', color: 'inherit' }}>
               {p.photo ? <img className="sq" src={p.photo} alt={p.food.name} loading="lazy" /> : <Dish name={p.food.name} />}
               <div className="mb"><span>{p.food.name}</span><span className={'rt ' + rc}>{rl}</span></div>
             </Link>
           )
         })}
       </div>
+      {hasMore&&<button className="btn ghost wide" onClick={loadOlder} disabled={busy}>{busy?'Loading…':'Load older plates'}</button>}
       {posts && !posts.length && <p style={{ color: 'var(--mut)' }}>{emptyPlates}</p>}
       {after}
     </div></div></section>

@@ -6,6 +6,7 @@ import { FxProvider } from './lib/fx'
 import { AuthProvider } from './lib/auth'
 import { configError } from './lib/supabase'
 import './styles/global.css'
+import './styles/mobile-social.css'
 
 /** Shown instead of a blank page when the deploy's Supabase settings are wrong. */
 function ConfigError({ problem }) {

@@ -13,7 +13,8 @@ export function useSignInGate() {
   const { toast } = useFx()
   const navigate = useNavigate()
   return useCallback(why => {
-    if (!supabase || session) return true
+    if (!supabase) { toast('Demo mode: connect Supabase to make changes.'); return false }
+    if (session) return true
     if (!ready) return false // still loading the session; don't bounce a signed-in user
     toast(`Sign in with your @uom.lk email ${why}`)
     navigate('/welcome')

@@ -1,0 +1,55 @@
+name: MoraPlates verification
+on:
+  push:
+    branches: [main, mobile-social-refresh]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  frontend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npm install --no-save --package-lock=false @playwright/test@1.51.1
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test
+  database:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: npm ci
+      - run: supabase init
+      - run: supabase start
+      - run: supabase db reset
+      - name: Test disposable local Supabase
+        shell: bash
+        run: |
+          set -a
+          source <(supabase status -o env)
+          set +a
+          node tests/integration/supabase.mjs
+      - if: always()
+        run: supabase stop --no-backup

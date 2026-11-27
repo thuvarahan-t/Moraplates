@@ -29,6 +29,7 @@ export default function Header() {
   // Sliding pill under the current tab (placeInd in index.html).
   useLayoutEffect(() => {
     const place = () => {
+      if (!nav.current || !ind.current) return
       const a = nav.current.querySelector('a[aria-current]')
       const el = ind.current
       if (!a) { el.style.width = '0'; return }

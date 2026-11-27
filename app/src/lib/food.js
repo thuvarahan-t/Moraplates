@@ -12,7 +12,11 @@ export function canteenSuper(foods) {
   return t ? Math.round((foods.reduce((n, f) => n + f.superCount, 0) / t) * 100) : 0
 }
 
-export const isOpen = c => { const h = new Date().getHours(); return h >= c.opensAt && h < c.closesAt }
+export const isReportedClosed = (c, now = Date.now()) => !!c.closedUntil && Date.parse(c.closedUntil) > now
+export const isOpen = (c, now = Date.now()) => {
+  const h = new Date(now + 330*60_000).getUTCHours()
+  return !isReportedClosed(c,now) && h >= c.opensAt && h < c.closesAt
+}
 export const hourLabel = h => (h === 0 || h === 24 ? '12am' : h === 12 ? '12pm' : h > 12 ? h - 12 + 'pm' : h + 'am')
 
 /** Rating chip for a food: [css class, label]. No ratings yet -> neutral chip. */

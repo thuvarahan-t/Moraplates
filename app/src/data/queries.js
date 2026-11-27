@@ -1,6 +1,7 @@
 // All Supabase reads and writes outside the home summary (api.js).
 import { supabase } from '../lib/supabase'
 import { photoUrl, uploadPhoto, compressImage } from '../lib/photos'
+import { isMissingSeenSchema, queryWithSeenFallback } from '../lib/optionalSchema'
 
 const need = () => { if (!supabase) throw new Error('This needs a Supabase project. Add keys to .env.') }
 const check = ({ data, error }) => { if (error) throw error; return data }
@@ -8,7 +9,7 @@ const check = ({ data, error }) => { if (error) throw error; return data }
 export const toCanteen = r => ({
   id: r.id, name: r.name, location: r.location, lat: r.lat, lng: r.lng,
   opensAt: r.opens_at, closesAt: r.closes_at, knownFor: r.known_for, colour: r.colour,
-  photo: photoUrl(r.photo_path), votes: r.votes_this_week ?? 0,
+  photo: photoUrl(r.photo_path), votes: r.votes_this_week ?? 0, closedUntil: r.reported_closed_until,
 })
 export const toFood = r => ({
   id: r.id, canteenId: r.canteen_id, name: r.name, price: r.price, photo: photoUrl(r.photo_path),
@@ -27,18 +28,21 @@ export function friendly(e) {
 const POST_FIELDS = 'id, user_id, canteen_id, rating, caption, photo_path, created_at, author:profiles!posts_user_id_fkey(full_name, faculty, avatar_path), food:foods(name, price), likes(count), comments(count)'
 
 /** Latest posts, optionally for one canteen or one author, with the viewer's likes. */
-export async function fetchPosts(viewerId, { canteenId, authorId, limit = 60 } = {}) {
+export async function fetchPosts(viewerId, { canteenId, authorId, postId, before, unseen = false, limit = 60 } = {}) {
   need()
-  let q = supabase.from('posts').select(POST_FIELDS).order('created_at', { ascending: false }).limit(limit)
-  if (canteenId) q = q.eq('canteen_id', canteenId)
-  if (authorId) q = q.eq('user_id', authorId)
-  // The viewer's recent likes load alongside the posts instead of after them.
-  const [res, likedRes] = await Promise.all([
-    q,
-    viewerId ? supabase.from('likes').select('post_id').eq('user_id', viewerId).order('created_at', { ascending: false }).limit(1000) : null,
-  ])
-  const rows = check(res)
-  const mine = new Set(likedRes ? check(likedRes).map(l => l.post_id) : [])
+  const query = includeSeen => {
+    let q = supabase.from('posts').select(POST_FIELDS + (includeSeen ? ', seen:post_views()' : '')).order('created_at', { ascending: false }).order('id', { ascending: false }).limit(limit)
+    if (includeSeen) q = q.is('seen', null)
+    if (postId) q = q.eq('id', postId)
+    if (before) q = q.or('created_at.lt.' + before.createdIso + ',and(created_at.eq.' + before.createdIso + ',id.lt.' + before.id + ')')
+    if (canteenId) q = q.eq('canteen_id', canteenId)
+    if (authorId) q = q.eq('user_id', authorId)
+    return q
+  }
+  // Keep the actual live posts readable if the seen-history migration is pending.
+  // The feed already filters locally remembered post IDs in that case.
+  const rows = check(await queryWithSeenFallback(query, !!viewerId && unseen))
+  const mine = new Set(viewerId && rows.length ? check(await supabase.from('likes').select('post_id').eq('user_id', viewerId).in('post_id', rows.map(r => r.id))).map(l => l.post_id) : [])
   return rows.map(r => ({
     id: r.id,
     userId: r.user_id,
@@ -46,9 +50,11 @@ export async function fetchPosts(viewerId, { canteenId, authorId, limit = 60 } =
     rating: r.rating,
     caption: r.caption,
     photo: photoUrl(r.photo_path),
+    photoPath: r.photo_path,
+    createdIso: r.created_at,
     createdAt: Date.parse(r.created_at),
     author: { name: r.author?.full_name ?? 'Student', faculty: r.author?.faculty, avatar: photoUrl(r.author?.avatar_path) },
-    food: { name: r.food.name, price: r.food.price },
+    food: { name: r.food?.name ?? 'Plate', price: r.food?.price ?? 0 },
     likes: r.likes[0]?.count ?? 0,
     comments: r.comments[0]?.count ?? 0,
     liked: mine.has(r.id),
@@ -77,7 +83,8 @@ export async function addComment(postId, body) {
 }
 export async function deleteComment(id) {
   need()
-  check(await supabase.from('comments').delete().eq('id', id))
+  const rows=check(await supabase.from('comments').delete().eq('id', id).select('id'))
+  if(!rows.length)throw new Error('Comment not found or not yours.')
 }
 
 // ---------------------------------------------------------------- canteens, foods, votes
@@ -113,14 +120,15 @@ export async function addFood(canteenId, name, price) {
   check(await supabase.from('foods').insert({ canteen_id: canteenId, name, price }))
 }
 
-/** Creates a canteen; uploads its photo first when there is one. Returns the new id. */
+/** Creates a canteen; an optional gallery upload must not mask successful creation. */
 export async function addCanteen(userId, { name, location, lat, lng, opensAt, closesAt, knownFor, photo }) {
   need()
   const row = check(await supabase.from('canteens').insert({
     name, location, lat, lng, opens_at: opensAt, closes_at: closesAt, known_for: knownFor || null,
   }).select('id').single())
-  if (photo) await addCanteenPhoto(userId, row.id, photo)
-  return row.id
+  let photoError=false
+  if (photo) try{await addCanteenPhoto(userId,row.id,photo)}catch(e){console.warn(e);photoError=true}
+  return {id:row.id,photoError}
 }
 
 // ---------------------------------------------------------------- canteen photos
@@ -141,15 +149,18 @@ export async function fetchCanteenPhotos(canteenId, limit = 30) {
 export async function addCanteenPhoto(userId, canteenId, file) {
   need()
   const path = await uploadPhoto(userId, await compressImage(file))
-  check(await supabase.from('canteen_photos').insert({ canteen_id: canteenId, photo_path: path }))
+  try { check(await supabase.from('canteen_photos').insert({ canteen_id: canteenId, photo_path: path })) }
+  catch (e) { await supabase.storage.from('photos').remove([path]); throw e }
 }
 
 /** Only works for the person who added it (RLS + storage policy). */
 export async function deleteCanteenPhoto(photo) {
   need()
-  check(await supabase.from('canteen_photos').delete().eq('id', photo.id))
+  const rows = check(await supabase.from('canteen_photos').delete().eq('id', photo.id).select('id'))
+  if (!rows.length) throw new Error('Photo not found or not yours.')
   const { error } = await supabase.storage.from('photos').remove([photo.path])
   if (error) console.warn('Photo row deleted but file remains:', error.message)
+  return !error
 }
 
 // ---------------------------------------------------------------- top + profile
@@ -199,11 +210,38 @@ export async function fetchPublicProfile(userId, viewerId) {
 export async function updateAvatar(userId, file, oldPath) {
   need()
   const path = await uploadPhoto(userId, await compressImage(file, 600))
-  check(await supabase.from('profiles').update({ avatar_path: path }).eq('id', userId))
+  try { check(await supabase.from('profiles').update({ avatar_path: path }).eq('id', userId).select('id').single()) }
+  catch (e) { await supabase.storage.from('photos').remove([path]); throw e }
   if (oldPath) await supabase.storage.from('photos').remove([oldPath])
 }
 
 export async function updateProfile(userId, { fullName, faculty, batch }) {
   need()
   check(await supabase.from('profiles').update({ full_name: fullName, faculty: faculty || null, batch: batch || null }).eq('id', userId))
+}
+
+export async function markPostSeen(postId) {
+  need()
+  const { error } = await supabase.from('post_views').insert({ post_id: postId })
+  if (error && error.code !== '23505' && !isMissingSeenSchema(error)) throw error
+}
+
+export async function deleteOwnPost(postId, userId) {
+  need()
+  const row = check(await supabase.from('posts').delete().eq('id', postId).eq('user_id', userId).select('photo_path').maybeSingle())
+  if (!row) throw new Error('Post not found or not yours.')
+  const { error } = await supabase.storage.from('photos').remove([row.photo_path])
+  return { storageRemoved: !error }
+}
+
+export async function fetchPeople(term = '', excludeId, limit = 12) {
+  need()
+  let q = supabase.from('profiles').select('id, full_name, faculty, batch, avatar_path').order('created_at', { ascending: false }).limit(limit)
+  if (excludeId) q = q.neq('id', excludeId)
+  const clean = term.trim().replace(/[%_*(),]/g, ' ').trim()
+  if (clean) q = q.ilike('full_name', '%' + clean + '%')
+  return check(await q).map(r => ({ id:r.id, name:r.full_name, faculty:r.faculty, batch:r.batch, avatar:photoUrl(r.avatar_path) }))
+}
+export async function reportClosed(id, withdraw = false) {
+  need(); check(await supabase.rpc(withdraw ? 'withdraw_canteen_closed' : 'report_canteen_closed', { canteen: id }))
 }
