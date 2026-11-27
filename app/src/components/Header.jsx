@@ -15,7 +15,7 @@ export const TABS = [
 
 export const Brand = props => (
   <Link className="brand" to="/" {...props}>
-    <svg className="mk" aria-hidden="true"><use href="#mark" /></svg><span><b>Mora</b>Plates</span>
+    <svg className="mk" aria-hidden="true"><use href="#mark" /></svg><span className="brand-wordmark"><b>Mora</b>Plates</span>
   </Link>
 )
 

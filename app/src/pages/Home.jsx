@@ -1,5 +1,6 @@
 import { Link } from '../components/NavLinks'
 import FeedSection from '../components/FeedSection'
+import HomeBanner from '../components/HomeBanner'
 import People from '../components/People'
 import { ChevronIcon, FlameIcon } from '../components/icons'
 import { useHomeData } from '../data/useHomeData'
@@ -29,7 +30,7 @@ export default function Home() {
         <div className="today">
           <h1>{firstName ? `${greeting}, ${firstName}` : "What's on your plate today?"}</h1>
           {hot && hotCanteen && (
-            <Link className="hotbar" to={`/canteens/${hotCanteen.id}`}>
+            <Link className="hotbar" to={`/canteens/${hotCanteen.id}/foods/${hot.id}`}>
               <span className="hi"><FlameIcon /></span>
               <span className="hbt">
                 <small>Today's hot plate</small>
@@ -41,7 +42,10 @@ export default function Home() {
           )}
         </div>
         <div className="social-layout">
-          <div><FeedSection canteens={canteens} /></div>
+          <div>
+            <HomeBanner canteens={canteens} />
+            <FeedSection canteens={canteens} />
+          </div>
           <aside className="social-aside"><People compact /></aside>
         </div>
       </div></div>
