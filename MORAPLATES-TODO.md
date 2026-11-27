@@ -35,7 +35,10 @@
 
 ## Production rollout
 
-- [ ] Apply pending migrations to the live Supabase project in filename order, including the post and food edit migration.
-- [ ] Configure the deployed Google Maps browser key and map ID, then deploy the frontend. OpenStreetMap is available without credentials.
+- [x] Back up and verify the live Supabase public schema before applying the release.
+- [x] Apply and verify all four release migrations on live Supabase.
+- [ ] Configure a production Google Maps browser key and map ID. The deployed app can use OpenStreetMap until Google Maps is configured.
+
+The production migration history records this release's four versions. The earlier schema was installed through SQL.
 
 See the [app README](app/README.md) for configuration and deployment details.
