@@ -147,7 +147,7 @@ input,textarea,select{font-size:16px!important}
 .admin-actions{display:flex;flex:none}
 .danger{color:#a33220}
 @media(max-width:760px){
-  .feed-filters .dd-pop{scroll-margin-bottom:100px}
+  html:has(.feed-filters .dd.open){scroll-padding-bottom:calc(86px + env(safe-area-inset-bottom,0px))}
   .cbanner-photo{grid-row:1}
   .cbanner .ctx{padding-bottom:var(--banner-padding)}
   .cbanner-report{justify-self:stretch;padding:0}

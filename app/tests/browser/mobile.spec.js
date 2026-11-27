@@ -108,6 +108,23 @@ test('feed dropdowns fit on mobile and filter and sort the plates', async ({ pag
   await expect(food.first()).toHaveText('Faluda')
 })
 
+test('the last canteen option stays tappable above the navigation on a short phone', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 450 })
+  await page.goto('/')
+
+  const canteen = page.getByRole('combobox', { name: 'Canteen', exact: true })
+  await canteen.tap()
+  await canteen.press('End')
+
+  const option = page.getByRole('option', { name: 'Hostel canteen', exact: true })
+  await expect.poll(() => option.evaluate(row => {
+    const { x, y, width, height } = row.getBoundingClientRect()
+    return row.contains(document.elementFromPoint(x + width / 2, y + height / 2))
+  })).toBe(true)
+  await option.tap()
+  await expect(canteen).toHaveAccessibleDescription('Hostel canteen')
+})
+
 test('the last unseen plate automatically brings back the past feed', async ({ page }) => {
   await page.addInitScript(() => {
     const key = 'moraplates:seen:v1:guest'
