@@ -25,6 +25,16 @@ export const configError = checkConfig()
 /** Supabase client, or null when no project is configured (the app then runs on sample data). */
 export const supabase = !configError && url && key ? createClient(url, key) : null
 
+/** Keep a verified password reset separate from the app's signed-in session. */
+export function createRecoveryClient() {
+  const client = createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'moraplates-password-recovery' },
+  })
+  // Supabase adds a visibility listener even with auto-refresh disabled. Remove it so the client can be released.
+  void client.auth.initialize().then(() => client.auth.stopAutoRefresh())
+  return client
+}
+
 if (configError) console.error('[MoraPlates] Supabase settings problem:', configError)
 else if (!supabase && import.meta.env.DEV) console.info('[MoraPlates] No Supabase keys in .env, using sample data.')
 

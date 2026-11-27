@@ -15,9 +15,12 @@ export function canteenSuper(foods) {
 }
 
 export const isReportedClosed = (c, now = Date.now()) => !!c.closedUntil && Date.parse(c.closedUntil) > now
+export const isReportedOpen = (c, now = Date.now()) => !!c.openUntil && Date.parse(c.openUntil) > now
 export const isOpen = (c, now = Date.now()) => {
+  if (isReportedClosed(c, now)) return false
+  if (isReportedOpen(c, now)) return true
   const h = new Date(now + 330*60_000).getUTCHours()
-  return !isReportedClosed(c,now) && h >= c.opensAt && h < c.closesAt
+  return h >= c.opensAt && h < c.closesAt
 }
 export const hourLabel = h => (h === 0 || h === 24 ? '12am' : h === 12 ? '12pm' : h > 12 ? h - 12 + 'pm' : h + 'am')
 

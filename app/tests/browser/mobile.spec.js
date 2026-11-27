@@ -13,12 +13,12 @@ test('all demo routes render in light mode without page errors or horizontal ove
   expect(errors).toEqual([])
 })
 
-test('canteen details offer both temporary and all-day closure reports', async ({ page }) => {
+test('canteen details offer one inline closure report on mobile', async ({ page }) => {
   await page.goto('/canteens/it')
   const closure = page.locator('.closure-box')
-  await expect(closure.getByText(/60 minutes or until midnight/)).toBeVisible()
+  await expect(closure.getByText('Report a temporary closure for 60 minutes.')).toBeVisible()
+  await expect(closure.getByRole('button')).toHaveCount(1)
   await expect(closure.getByRole('button', { name: 'Report closed', exact: true })).toBeVisible()
-  await expect(closure.getByRole('button', { name: 'Report closed today', exact: true })).toBeVisible()
 })
 
 test('feed likes, shares and seen history; a viewed plate remains on author profile',async({page})=>{
@@ -123,9 +123,20 @@ test('profile search and native photo crop preview work on phone',async({page})=
   await page.getByRole('button',{name:'Post your plate',exact:true}).last().click()
   const data=await page.evaluate(()=>{const c=document.createElement('canvas');c.width=600;c.height=400;const ctx=c.getContext('2d');ctx.fillStyle='#d97706';ctx.fillRect(0,0,600,400);return c.toDataURL('image/png').split(',')[1]})
   await page.getByLabel('Photo of your plate',{exact:true}).setInputFiles({name:'food.png',mimeType:'image/png',buffer:Buffer.from(data,'base64')})
+  // selected straight away, as taken; the editor only opens from the pencil
+  const plate=page.getByAltText('Your plate',{exact:true})
+  await expect(plate).toBeVisible()
+  await expect(page.getByLabel('Crop photo',{exact:true})).toHaveCount(0)
+  await expect.poll(()=>plate.evaluate(i=>i.naturalWidth/i.naturalHeight)).toBe(1.5)
+  await page.getByRole('button',{name:'Edit photo',exact:true}).click()
   await expect(page.getByLabel('Crop photo',{exact:true})).toBeVisible()
   await page.getByRole('button',{name:'Square',exact:true}).click()
   await expect.poll(()=>page.locator('canvas.crop-preview').evaluate(c=>c.width/c.height)).toBe(1)
-  await page.getByRole('button',{name:'Use crop',exact:true}).click()
-  await expect(page.getByAltText('Your plate',{exact:true})).toBeVisible()
+  await page.getByRole('button',{name:'Done',exact:true}).click()
+  await expect.poll(()=>plate.evaluate(i=>i.naturalWidth/i.naturalHeight)).toBe(1)
+  // reopening continues from the last edit
+  await page.getByRole('button',{name:'Edit photo',exact:true}).click()
+  await expect(page.getByRole('button',{name:'Square',exact:true})).toHaveAttribute('aria-pressed','true')
+  await page.getByRole('button',{name:'Cancel',exact:true}).click()
+  await expect(plate).toBeVisible()
 })

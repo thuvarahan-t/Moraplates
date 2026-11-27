@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import People from '../components/People'
-import CropPhoto from '../components/CropPhoto'
+import { exportPhoto } from '../lib/photoEdit'
 import { checkAdmin } from '../data/admin'
 import { samplePosts } from '../data/feed'
 import { Navigate, useNavigate, useParams } from 'react-router'
@@ -95,16 +95,15 @@ function OwnProfile({ uid, email, profile, details }) {
   const { data, error, reload } = details
   const [editing, setEditing] = useState(false)
   const [uploading, setUploading] = useState(false)
-  const [cropFile,setCropFile]=useState(null)
   // New accounts start with the email name ("thuvarahant.23"); nudge them to set a real one.
   const needsName = profile.fullName === email.split('@')[0]
   const sub = [profile.faculty, profile.batch].filter(Boolean).join(' · ') || email
 
-  const pickAvatar = async file => {
-    setCropFile(null)
-    if (!file) return
+  const pickAvatar = async picked => {
+    if (!picked) return
     setUploading(true)
     try {
+      const file = await exportPhoto(picked, { fixedAspect: 1, max: 600 })
       await updateAvatar(uid, file, profile.avatarPath)
       refreshProfile()
       invalidate()
@@ -124,7 +123,7 @@ function OwnProfile({ uid, email, profile, details }) {
         <label className={'avpick' + (uploading ? ' busy' : '')} title="Change profile photo">
           <Avatar name={profile.fullName} url={profile.avatar} />
           <span className="avcam" aria-hidden="true"><CameraIcon size={16} /></span>
-          <input type="file" accept="image/*" onChange={e=>{const f=e.target.files?.[0];e.target.value='';if(f)setCropFile(f)}} disabled={uploading} aria-label="Change profile photo" hidden />
+          <input type="file" accept="image/*" onChange={e=>{const f=e.target.files?.[0];e.target.value='';if(f)pickAvatar(f)}} disabled={uploading} aria-label="Change profile photo" hidden />
         </label>
         <div className="who"><b>{profile.fullName}</b><span style={{ color: 'var(--mut)' }}>{uploading ? 'Uploading photo…' : sub}</span></div>
         <div className="pro-acts">
@@ -132,7 +131,7 @@ function OwnProfile({ uid, email, profile, details }) {
           <button className="btn sm" onClick={() => openPost()}>Post your plate</button>
         </div>
       </>}
-      below={<>{cropFile && <CropPhoto file={cropFile} fixedAspect={1} max={600} onCancel={()=>setCropFile(null)} onDone={pickAvatar}/>} {(editing || needsName) && <EditProfile uid={uid} profile={profile} onDone={() => setEditing(false)} />}</>}
+      below={<>{(editing || needsName) && <EditProfile uid={uid} profile={profile} onDone={() => setEditing(false)} />}</>}
       extra={data?.favCanteen ? (
         <Link className="card ccard rise tilt" to={`/canteens/${data.favCanteen.id}`} style={{ '--i': 2, boxShadow: 'inset 0 0 0 2px var(--leaf)' }}>
           <span className="rank" style={{ background: 'var(--sb)', color: 'var(--st)' }}><HeartIcon /></span>

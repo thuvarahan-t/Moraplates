@@ -7,7 +7,8 @@ import { uploadPhoto } from '../lib/photos'
 import { SAMPLE_CANTEENS, SAMPLE_FOODS } from '../data/sample'
 import { CameraIcon, CloseIcon } from './icons'
 import Dropdown from './Dropdown'
-import CropPhoto from './CropPhoto'
+import CropPhoto, { EditPhotoButton } from './CropPhoto'
+import { usePhotoPick } from '../lib/usePhotoPick'
 import StarRating, { starsToRating } from './StarRating'
 
 const NEW = '__new'
@@ -45,9 +46,8 @@ export default function PostDialog({ request, onClose, onPosted }) {
   const [newPrice, setNewPrice] = useState('')
   const [stars, setStars] = useState(0)
   const [caption, setCaption] = useState('')
-  const [photo, setPhoto] = useState(null)
-  const [cropFile, setCropFile] = useState(null)
-  const [preview, setPreview] = useState(null)
+  const pic = usePhotoPick()
+  const { photo, preview } = pic
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -71,22 +71,21 @@ export default function PostDialog({ request, onClose, onPosted }) {
   const foods = menu?.foods.filter(f => f.canteenId === cid) ?? []
   const fid = foodId === NEW || foods.some(f => f.id === foodId) ? foodId : null
 
-  useEffect(() => () => preview && URL.revokeObjectURL(preview), [preview])
   useEffect(() => { if (fid === NEW) nameInput.current?.focus({ preventScroll: false }) }, [fid])
 
   if (needsSignIn) return null
 
   const pickPhoto = e => {
     const f = e.target.files?.[0]
-    if (!f) return
     e.target.value = ''
-    setCropFile(f)
+    if (!f) return
     setErr('')
+    pic.pick(f)
   }
 
   const submit = async e => {
     e.preventDefault()
-    if (busy || cropFile) return
+    if (busy || pic.editing || pic.processing) return
     if (!photo) return setErr('Add a photo of your plate.')
     if (!cid) return setErr('Choose the canteen.')
     if (!fid) return setErr('Choose what you ate, or add it.')
@@ -141,12 +140,16 @@ export default function PostDialog({ request, onClose, onPosted }) {
         </div>
 
         <div className="pf-body">
-          {cropFile ? <CropPhoto file={cropFile} onCancel={()=>setCropFile(null)} onDone={f=>{setPhoto(f);setPreview(URL.createObjectURL(f));setCropFile(null)}}/> : (
+          {pic.editing ? <CropPhoto file={pic.original} initial={pic.edit} onCancel={pic.closeEditor} onDone={pic.finishEdit} /> : (
             <div className="pf-top">
-              <label className={'pick pf-photo' + (preview ? ' has' : '')}>
-                {preview ? <><img src={preview} alt="Your plate" /><span className="chg">Change</span></> : <><CameraIcon /><span>Add photo</span></>}
-                <input type="file" accept="image/*" onChange={pickPhoto} disabled={busy} aria-label="Photo of your plate" />
-              </label>
+              <div className="pf-photo-wrap">
+                <label className={'pick pf-photo' + (preview ? ' has' : '') + (pic.processing ? ' busy' : '')}>
+                  {preview ? <><img src={preview} alt="Your plate" /><span className="chg">Change</span></>
+                    : <><CameraIcon /><span>{pic.processing ? 'Adding…' : 'Add photo'}</span></>}
+                  <input type="file" accept="image/*" onChange={pickPhoto} disabled={busy || pic.processing} aria-label="Photo of your plate" />
+                </label>
+                {preview && <EditPhotoButton onClick={pic.openEditor} disabled={busy || pic.processing} />}
+              </div>
               <div className="pf-where">
                 <div className="fl">
                   <span id="pf-canteen">Canteen</span>
@@ -180,7 +183,7 @@ export default function PostDialog({ request, onClose, onPosted }) {
             </div>
           )}
 
-          {fid === NEW && !cropFile && (
+          {fid === NEW && !pic.editing && (
             <div className="newf pf-new">
               <label className="fl"><span>New food name</span><input ref={nameInput} maxLength={40} placeholder="Cheese kottu" value={newName} onChange={e => { setNewName(e.target.value); setErr('') }} /></label>
               <label className="fl pf-price"><span>Price (Rs)</span><input type="number" min="1" max="5000" inputMode="numeric" placeholder="450" value={newPrice} onChange={e => { setNewPrice(e.target.value); setErr('') }} /></label>
@@ -196,8 +199,8 @@ export default function PostDialog({ request, onClose, onPosted }) {
         </div>
 
         <div className="pf-foot">
-          {err && <p className="err" role="alert">{err}</p>}
-          <button className="btn wide" type="submit" ref={submitBtn} disabled={busy || !menu || !!cropFile}>{busy ? 'Posting…' : 'Post to feed'}</button>
+          {(err || pic.error) && <p className="err" role="alert">{err || pic.error}</p>}
+          <button className="btn wide" type="submit" ref={submitBtn} disabled={busy || !menu || pic.editing || pic.processing}>{busy ? 'Posting…' : 'Post to feed'}</button>
         </div>
       </form>
     </dialog>

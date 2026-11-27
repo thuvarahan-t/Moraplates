@@ -73,6 +73,48 @@ try{
   adminCanteen=check(await b.client.from('canteens').select('id').eq('name',name).single()).id
   check(await b.client.rpc('admin_save',{kind:'canteens',p:{id:adminCanteen,name,location:'Updated',opens_at:8,closes_at:17}}))
   assert.equal(check(await a.client.from('canteens').select('location').eq('id',adminCanteen).single()).location,'Updated')
+
+  const reopenCanteen = { canteen: adminCanteen }
+  const guest = client(anon)
+  const status = async () => check(await guest.from('canteen_standings')
+    .select('reported_closed_until, reported_open_until').eq('id', adminCanteen).single())
+  assert.ok((await guest.rpc('report_canteen_open', reopenCanteen)).error, 'Guests cannot report reopening')
+  check(await a.client.rpc('report_canteen_open', reopenCanteen))
+  assert.deepEqual(await status(), { reported_closed_until: null, reported_open_until: null })
+
+  check(await a.client.rpc('report_canteen_closed', reopenCanteen))
+  assert.ok((await status()).reported_closed_until)
+  const beforeReopen = Date.now()
+  check(await b.client.rpc('report_canteen_open', reopenCanteen))
+  const reopened = await status()
+  const openExpiry = Date.parse(reopened.reported_open_until)
+  assert.equal(reopened.reported_closed_until, null, 'Another student can clear an active closure')
+  assert.ok(openExpiry >= beforeReopen + 59 * 60_000 && openExpiry <= Date.now() + 61 * 60_000)
+  check(await a.client.rpc('report_canteen_open', reopenCanteen))
+  assert.deepEqual(await status(), reopened, 'Repeating a reopening without a newer closure keeps the original expiry')
+
+  check(await a.client.rpc('report_canteen_closed', reopenCanteen))
+  const reclosed = await status()
+  assert.ok(reclosed.reported_closed_until, 'The original reporter can close again after a reopening')
+  assert.equal(reclosed.reported_open_until, null, 'A newer closure takes precedence over the reopening')
+  check(await a.client.rpc('withdraw_canteen_closed', reopenCanteen))
+  assert.deepEqual(await status(), reopened, 'Withdrawing a newer closure keeps the original open report')
+
+  check(await a.client.rpc('report_canteen_closed', reopenCanteen))
+  check(await b.client.rpc('report_canteen_closed_today', reopenCanteen))
+  check(await a.client.rpc('report_canteen_open', reopenCanteen))
+  assert.equal((await status()).reported_closed_until, null, 'The original reporter can clear overlapping closures')
+  check(await b.client.rpc('report_canteen_closed_today', reopenCanteen))
+  assert.ok((await status()).reported_closed_until, 'A suppressed report can be submitted again for the same day')
+  check(await b.client.rpc('report_canteen_open', reopenCanteen))
+  const reopenedAgain = await status()
+  assert.equal(reopenedAgain.reported_closed_until, null, 'The student who reported a day-long closure can reopen it')
+  assert.ok(reopenedAgain.reported_open_until)
+  check(await b.client.rpc('withdraw_canteen_closed', reopenCanteen))
+  assert.deepEqual(await status(), reopenedAgain, 'Withdrawing affects only the student’s closure')
+
+  const openReports = await a.client.from('canteen_open_reports').select('canteen_id').eq('canteen_id', adminCanteen)
+  assert.ok(openReports.error || openReports.data.length === 0, 'Open report rows remain private')
   check(await b.client.rpc('admin_delete',{kind:'canteens',p:{id:adminCanteen}}));adminCanteen=null
   check(await a.client.rpc('cast_vote',{canteen:'wala'}))
   check(await a.client.rpc('cast_vote',{canteen:'goda'}))
@@ -86,7 +128,7 @@ try{
   assert.equal(check(await b.client.from('posts').select('id').eq('id',post)).length,0)
   post=null;path=null
   check(await b.client.rpc('admin_delete',{kind:'foods',p:{id:food}}));food=null
-  console.log('PASS: upload, non-owner protection, seen privacy, closure, admin CRUD, vote switching, owner post and storage deletion')
+  console.log('PASS: upload, non-owner protection, seen privacy, closure and reopening, admin CRUD, vote switching, owner post and storage deletion')
 }finally{
   if(path)await service.storage.from('photos').remove([path])
   if(post)await service.from('posts').delete().eq('id',post)
