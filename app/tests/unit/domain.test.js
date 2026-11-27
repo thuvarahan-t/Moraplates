@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {cropRect} from '../../src/lib/crop.js'
-import {canteenStatusLabel,hourLabel,isOpen,isReportedClosed,isReportedOpen,lastReportLabel,withPrimaryPhoto} from '../../src/lib/food.js'
+import {canteenStatusLabel,homeCanteenSlides,hourLabel,isOpen,isReportedClosed,isReportedOpen,lastReportLabel,withPrimaryPhoto} from '../../src/lib/food.js'
 import {applyVote} from '../../src/lib/vote.js'
 import {readSeen,rememberSeen} from '../../src/lib/seen.js'
 
@@ -58,6 +58,23 @@ test('the primary photo leads a canteen gallery even when omitted from the newes
   const recent = { id: 'recent' }
   assert.deepEqual(withPrimaryPhoto({ primaryPhoto }, [recent]), [primaryPhoto, recent])
   assert.deepEqual(withPrimaryPhoto({ primaryPhoto }, [recent, primaryPhoto]), [primaryPhoto, recent])
+})
+test('home canteen slides use up to five recent photos and skip canteens without photos', () => {
+  const gallery = Array.from({ length: 6 }, (_, index) => ({
+    id: `photo-${index + 1}`, canteenId: 'busy', url: `/photo-${index + 1}.jpg`,
+  }))
+  const canteens = [
+    { id: 'empty', votes: 20 },
+    { id: 'legacy', votes: 5, photo: '/legacy.jpg' },
+    { id: 'busy', votes: 10, primaryPhoto: gallery.at(-1) },
+  ]
+  const summarize = slides => slides.map(({ canteen, photo }) => [canteen.id, photo.id])
+  assert.deepEqual(summarize(homeCanteenSlides(canteens, gallery)), [
+    ['busy', 'photo-1'], ['busy', 'photo-2'], ['busy', 'photo-3'], ['busy', 'photo-4'], ['busy', 'photo-5'], ['legacy', 'legacy'],
+  ])
+  canteens[2].primaryPhoto = gallery[2]
+  assert.deepEqual(homeCanteenSlides(canteens, gallery)[0].photo, gallery[2])
+  assert.deepEqual(homeCanteenSlides([canteens[0]]), [])
 })
 test('switching or removing one vote preserves counts and input',()=>{
   const c=[{id:'a',votes:2},{id:'b',votes:3}]

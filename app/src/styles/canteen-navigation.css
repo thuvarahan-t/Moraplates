@@ -9,52 +9,33 @@
 }
 
 .bnr-slide { min-height: clamp(190px, 29vw, 265px); }
-.bnr-art { position: absolute; inset: 0; }
-.bnr-art .dish { height: 100%; aspect-ratio: auto; }
-.bnr-art .dish i { width: clamp(116px, 27%, 176px); }
-.bnr-play {
+.bnr-photo {
   position: absolute;
-  z-index: 4;
-  top: 10px;
-  right: 10px;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.bnr-arrow {
+  position: absolute;
+  z-index: 3;
+  top: 46%;
+  transform: translateY(-50%);
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: 0;
   border-radius: 50%;
   background: #221b1abc;
   color: white;
   cursor: pointer;
+  touch-action: manipulation;
 }
-.bnr > .dots {
-  gap: 0;
-  bottom: 9px;
-  right: 9px;
-  max-width: calc(100% - 18px);
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.bnr > .dots button {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 24px;
-  height: 24px;
-  background: transparent;
-}
-.bnr > .dots button:focus-visible { outline-offset: -3px; }
-.bnr > .dots button::after {
-  content: "";
-  width: 7px;
-  height: 7px;
-  border-radius: 8px;
-  background: #fff4e4a0;
-  transition: width .25s ease;
-}
-.bnr > .dots button.on::after { width: 18px; background: #fff4e4; }
-.bnr-txt { padding-bottom: 34px; }
+.bnr-prev { left: 10px; }
+.bnr-next { right: 10px; }
+.bnr-arrow:hover, .bnr-arrow:focus-visible { background: #221b1a; }
 .bnr-slide:focus-visible { outline-offset: -4px; }
 
 .canteen-card-actions {
@@ -99,5 +80,5 @@
 
 @media (prefers-reduced-motion: reduce) {
   .brand-wordmark { animation: none; }
-  .bnav-drag-pill, .bnr > .dots button::after { transition: none; }
+  .bnav-drag-pill { transition: none; }
 }
