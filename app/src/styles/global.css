@@ -283,17 +283,8 @@ body{padding-bottom:86px}#toast{bottom:100px}
 .mailbox:focus-within{border-color:var(--tom);box-shadow:0 0 0 4px color-mix(in srgb,var(--tom) 20%,transparent)}
 .fl .mailbox input{flex:1;border:0;box-shadow:none;border-radius:0;background:none;min-height:0}
 .mailbox>span{display:flex;align-items:center;padding:0 14px;background:var(--chip);color:var(--brand);font-weight:700}
-/* Post actions + comments */
+/* Post actions */
 .acts{display:flex;gap:4px;margin-left:-12px}.acts .like{margin-left:0}
-.cmts{border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:10px;animation:rise .4s var(--ease)}
-.cm{display:flex;gap:8px;align-items:flex-start;font-size:14px}.cm .av{width:30px;height:30px;font-size:11px}
-.cm>div{flex:1;background:var(--chip);border-radius:14px;padding:8px 12px;line-height:1.4}
-.cm b{font-size:13px}.cm small{color:var(--mut);font-size:12px;margin-left:6px}
-.cm-del{border:0;background:none;color:var(--mut);font-size:12px;font-weight:700;padding:4px 0 0;cursor:pointer}.cm-del:hover{color:var(--at)}
-.cm-empty{color:var(--mut)}
-.cbox{display:flex;gap:8px}
-.cbox input{flex:1;min-height:44px;border-radius:999px;border:1px solid var(--line);background:var(--card);padding:0 16px;outline:0;font-size:15px}
-.cbox input:focus{border-color:var(--tom)}
 /* Maps */
 .map{position:relative;z-index:0;width:100%;border-radius:16px;overflow:hidden;background:var(--chip)}
 .mapcard{padding:10px;display:flex;flex-direction:column;gap:8px;margin-bottom:20px}.mapcard small{color:var(--mut);padding:0 6px 4px}
@@ -441,7 +432,6 @@ main{padding-bottom:clamp(24px,4vw,48px)}
 .me{overflow:hidden}.me img{width:100%;height:100%;object-fit:cover}
 .ph-who{flex:1;display:flex;align-items:center;gap:10px;min-width:0;text-decoration:none;color:inherit}
 .ph-who:hover b{text-decoration:underline;text-underline-offset:3px}
-.cm-name{font-size:13px;font-weight:700;color:var(--ink);text-decoration:none}.cm-name:hover{text-decoration:underline}
 .avpick{position:relative;cursor:pointer;flex:none;border-radius:50%}
 .avpick .avcam{position:absolute;right:-2px;bottom:-2px;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--tom);color:#fff;box-shadow:0 0 0 3px var(--card);transition:transform .25s var(--spring)}
 .avpick:hover .avcam{transform:scale(1.1)}.avpick.busy{opacity:.6;pointer-events:none}

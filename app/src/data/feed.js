@@ -50,9 +50,10 @@ export function useLikeToggle(postsRef, setPosts) {
 
 const PAGE_SIZE = 20
 const feedKey = (canteenId, past, before) => queryKey('feed', canteenId, past, before?.createdIso, before?.id)
+const hasNextPage = page => !!page && (!page.past || !!page.cursor)
 
-function feedPage(rows, past, seen) {
-  const posts = past ? rows : rows.filter(p => !seen.has(String(p.id)))
+function feedPage(rows, past, seen, displayed) {
+  const posts = rows.filter(p => !displayed?.has(p.id) && (past || !seen.has(String(p.id))))
   return { posts, cursor: rows.length === PAGE_SIZE ? rows.at(-1) : null, past }
 }
 
@@ -70,25 +71,32 @@ function readCachedFeed(cache, canteenId, seen) {
   return rows ? feedPage(rows, true, seen) : null
 }
 
-async function fetchFeedPage(cache, userId, canteenId, { past, before, seen, isCurrent }) {
+async function fetchFeedPage(cache, userId, canteenId, { past, before, seen, displayed, isCurrent }) {
   if (!supabase) {
-    const posts = samplePosts().filter(p => (!canteenId || p.canteenId === canteenId) && (past || !seen.has(p.id)))
-    return { posts, cursor: null, past }
+    const rows = samplePosts().filter(p => !canteenId || p.canteenId === canteenId)
+    return feedPage(rows, past, seen, displayed)
   }
 
   let cursor = before
   do {
     const pageStart = cursor
     const rows = await cache.load(feedKey(canteenId, past, pageStart), () => fetchPosts(userId, { canteenId, unseen: !past, before: pageStart, limit: PAGE_SIZE }))
-    const page = feedPage(rows, past, seen)
+    const page = feedPage(rows, past, seen, displayed)
     if (page.posts.length || !page.cursor) return page
     cursor = page.cursor
   } while (isCurrent())
 }
 
+async function fetchFollowingPage(cache, userId, canteenId, page, options) {
+  if (!page.past && page.cursor) {
+    const fresh = await fetchFeedPage(cache, userId, canteenId, { ...options, past: false, before: page.cursor })
+    if (!options.isCurrent() || fresh.posts.length) return fresh
+  }
+  return fetchFeedPage(cache, userId, canteenId, { ...options, past: true, before: page.past ? page.cursor : null })
+}
+
 /** Keep current cards in place while reading, and bring back history once the fresh queue is exhausted. */
 export function useFeed(canteenId) {
-  const { toast } = useFx()
   const { session, ready } = useAuth()
   const { cache, version } = usePost()
   const userId = session?.user?.id
@@ -104,19 +112,16 @@ export function useFeed(canteenId) {
   const [loadingMore, setLoadingMore] = useState(false)
   const [pageError, setPageError] = useState(false)
   const [seenCount, setSeenCount] = useState(0)
-  const generation = useRef(0)
-  const pending = useRef(false)
-  const seen = useRef(new Set())
+  const active = useRef(null)
   const current = useRef(posts)
   const visiblePosts = displayScope === start ? posts : start.page?.posts ?? null
   current.current = visiblePosts
   useEffect(() => {
     if (!ready) return
-    const run = ++generation.current
-    const isCurrent = () => run === generation.current
-    const options = { seen: new Set(start.seen), isCurrent }
-    seen.current = options.seen
-    pending.current = false
+    const run = { scope: start, seen: new Set(start.seen), requestedPage: null }
+    active.current = run
+    const isCurrent = () => active.current === run
+    const options = { seen: run.seen, isCurrent }
     setDisplayScope(start)
     setPosts(start.page?.posts ?? null)
     setError(null)
@@ -141,54 +146,67 @@ export function useFeed(canteenId) {
       }
     }
     if (!start.page) load()
-    return () => { generation.current++ }
+    return () => { active.current = null }
   }, [cache, userId, canteenId, ready, start])
 
   const markSeen = useCallback(id => {
-    if (seen.current.has(String(id))) return
-    seen.current.add(String(id))
+    const run = active.current
+    if (run?.scope !== start || run.seen.has(String(id))) return
+    run.seen.add(String(id))
     setSeenCount(count => count + 1)
     rememberSeen(userId, id)
     if (supabase && userId) markPostSeen(id).catch(e => console.warn('Seen history sync failed', e.message))
-  }, [userId])
+  }, [start, userId])
+
+  const fetchNext = useCallback((run, after, displayed) => fetchFollowingPage(cache, userId, canteenId, after, {
+    isCurrent: () => active.current === run,
+    seen: run.seen,
+    displayed,
+  }), [cache, userId, canteenId])
+
+  useEffect(() => {
+    const run = active.current
+    if (run?.scope !== start || displayScope !== start || !hasNextPage(page) || pageError || run.requestedPage === page) return
+    // Warm the same cache the near-bottom loader uses, without changing the visible list.
+    fetchNext(run, page, new Set(current.current.map(p => p.id))).catch(() => {})
+  }, [displayScope, start, page, pageError, fetchNext])
 
   const loadMore = useCallback(async () => {
-    if (displayScope !== start || !page || pending.current || (page.past && !page.cursor)) return
-    const run = generation.current
-    const isCurrent = () => run === generation.current
-    const past = page.past || !page.cursor
-    pending.current = true
+    const run = active.current
+    if (run?.scope !== start || displayScope !== start || !hasNextPage(page) || run.requestedPage === page) return
+    const isCurrent = () => active.current === run
+    const displayed = new Set(current.current.map(p => p.id))
+    run.requestedPage = page
     setLoadingMore(true)
     setPageError(false)
     try {
-      const next = await fetchFeedPage(cache, userId, canteenId, { past, before: page.cursor, seen: seen.current, isCurrent })
+      const next = await fetchNext(run, page, displayed)
       if (!isCurrent()) return
-      setPosts(old => {
-        if (!old) return old
-        const existing = new Set(old.map(p => p.id))
-        return [...old, ...next.posts.filter(p => !existing.has(p.id))]
-      })
-      setPage({ cursor: next.cursor, past: next.past })
-      if (past && !page.past) toast("You're all caught up")
+      setPosts(old => [...old, ...next.posts])
+      const freshCount = page.past ? page.freshCount : displayed.size
+      setPage({ cursor: next.cursor, past: next.past, freshCount })
     } catch {
-      if (isCurrent()) setPageError(true)
-    } finally {
       if (isCurrent()) {
-        pending.current = false
-        setLoadingMore(false)
+        run.requestedPage = null
+        setPageError(true)
       }
+    } finally {
+      if (isCurrent()) setLoadingMore(false)
     }
-  }, [cache, canteenId, displayScope, page, start, toast, userId])
+  }, [displayScope, page, start, fetchNext])
 
   useEffect(() => {
-    if (page && !page.past && !pageError && seenCount === posts?.length) loadMore()
+    if (page && !page.past && !page.cursor && !pageError && seenCount === posts?.length) loadMore()
   }, [page, pageError, seenCount, posts?.length, loadMore])
 
   const toggleLike = useLikeToggle(current, setPosts)
-  const visiblePage = displayScope === start ? page : start.page
+  const inScope = displayScope === start
+  const visiblePage = inScope ? page : start.page
   return {
-    posts: visiblePosts ?? [], loading: visiblePosts === null, error: displayScope === start ? error : null,
-    more: !!visiblePage?.cursor, loadingMore, pageError, caughtUp: !!visiblePage?.past, loadMore, markSeen, toggleLike,
+    posts: visiblePosts ?? [], scope: start, loading: visiblePosts === null, error: inScope ? error : null,
+    more: hasNextPage(visiblePage), loadingMore: inScope && loadingMore, pageError: inScope && pageError,
+    caughtUp: !!visiblePage?.past, freshCount: visiblePage?.past ? visiblePage.freshCount ?? 0 : visiblePosts?.length ?? 0,
+    awaitingHistory: !!visiblePage && !visiblePage.past && !visiblePage.cursor, loadMore, markSeen, toggleLike,
     refresh: () => { cache.invalidate('feed'); refresh(n => n + 1) },
   }
 }

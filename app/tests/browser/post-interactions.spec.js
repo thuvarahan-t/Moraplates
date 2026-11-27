@@ -2,10 +2,14 @@ import { expect, test } from '@playwright/test'
 
 test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
 
-test('double-tapping a post likes it once and does not toggle it off', async ({ page }) => {
+test('double-tapping a post replays the plate animation and likes it once', async ({ page }) => {
   await page.addInitScript(() => {
     window.taps = []
     window.likeSounds = 0
+    window.plateReactions = 0
+    document.addEventListener('animationstart', event => {
+      if (event.animationName === 'plate-reaction-pop') window.plateReactions += 1
+    })
     Object.defineProperty(navigator, 'vibrate', { value: duration => window.taps.push(duration) })
     const createOscillator = AudioContext.prototype.createOscillator
     AudioContext.prototype.createOscillator = function () {
@@ -22,13 +26,18 @@ test('double-tapping a post likes it once and does not toggle it off', async ({ 
   await media.tap()
   const unlike = page.getByRole('button', { name: 'Unlike plate', exact: true })
   await expect(unlike).toHaveText(String(original + 1))
+  await expect.poll(() => page.evaluate(() => window.plateReactions)).toBe(1)
   await media.tap()
   await media.tap()
   await expect(unlike).toHaveText(String(original + 1))
+  await expect.poll(() => page.evaluate(() => window.plateReactions)).toBe(2)
   expect(await page.evaluate(() => window.taps)).toEqual([12])
   await expect.poll(() => page.evaluate(() => window.likeSounds)).toBe(1)
   await unlike.tap()
   await expect(like).toHaveText(String(original))
+  await like.tap()
+  await expect(unlike).toHaveText(String(original + 1))
+  await expect.poll(() => page.evaluate(() => window.plateReactions)).toBe(3)
 })
 
 test('the post editor preserves tall photos and offers each requested crop', async ({ page }) => {

@@ -1,10 +1,10 @@
+import { useOutletContext } from 'react-router'
 import { Link } from '../components/NavLinks'
 import FeedSection from '../components/FeedSection'
 import HomeBanner from '../components/HomeBanner'
 import People from '../components/People'
 import { ChevronIcon, FlameIcon } from '../components/icons'
 import { useHomeData } from '../data/useHomeData'
-import { useAuth } from '../lib/auth'
 import { superPercent, totalRatings } from '../lib/food'
 import { plural } from '../lib/format'
 
@@ -12,12 +12,8 @@ const colomboHour = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Colombo',
 
 export default function Home() {
   const { data } = useHomeData()
-  const { profile, session } = useAuth()
+  const firstName = useOutletContext()
   const { canteens, foods, platesToday } = data
-  const fullName = session && profile?.id !== session.user.id
-    ? session.user.user_metadata?.full_name
-    : profile?.fullName
-  const firstName = typeof fullName === 'string' ? fullName.trim().split(/\s+/, 1)[0] : ''
   const hour = Number(colomboHour.format())
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
 
