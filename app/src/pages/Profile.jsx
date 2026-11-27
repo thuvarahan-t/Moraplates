@@ -9,16 +9,18 @@ import Avatar from '../components/Avatar'
 import Loader from '../components/Loader'
 import CountUp from '../components/CountUp'
 import Dish from '../components/Dish'
+import VerifiedBadge from '../components/VerifiedBadge'
 import { BackIcon, CameraIcon, CheckIcon, HeartIcon, LockIcon, LogOutIcon, PencilIcon } from '../components/icons'
 import { useAuth } from '../lib/auth'
-import { badgesFor } from '../lib/badges'
+import { badgesFor, isVerifiedProfile } from '../lib/badges'
 import { useFx } from '../lib/fx'
 import { RATING } from '../lib/format'
 import { usePost } from '../lib/post'
+import { useSignInGate } from '../lib/useSignInGate'
 import { supabase } from '../lib/supabase'
 import { useQuery } from '../data/useQuery'
 import { queryKey } from '../data/queryCache'
-import { fetchPosts, fetchProfilePage, fetchPublicProfile, friendly, updateAvatar, updateProfile } from '../data/queries'
+import { fetchFollowSummary, fetchPosts, fetchProfilePage, fetchPublicProfile, friendly, setProfileFollow, updateAvatar, updateProfile } from '../data/queries'
 import { InstallButton } from '../components/InstallPrompt'
 
 const TONES = { leaf: ['var(--sb)', 'var(--st)'], mus: ['var(--ob)', 'var(--ot)'], tom: ['var(--ab)', 'var(--at)'] }
@@ -71,7 +73,11 @@ export function UserProfile() {
       viewerId={uid}
       head={<>
         <Avatar name={p.fullName} url={p.avatar} />
-        <div className="who"><b>{p.fullName}</b><span style={{ color: 'var(--mut)' }}>{[p.faculty, p.batch].filter(Boolean).join(' · ') || 'Mora student'}</span></div>
+        <div className="who">
+          <b>{p.fullName}{isVerifiedProfile(data.stats) && <VerifiedBadge />}</b>
+          <span style={{ color: 'var(--mut)' }}>{[p.faculty, p.batch].filter(Boolean).join(' · ') || 'Mora student'}</span>
+          <ProfileFollows key={`${id}:${uid ?? ''}`} userId={id} viewerId={uid} />
+        </div>
       </>}
       stats={data.stats}
       posts={data.posts}
@@ -125,7 +131,11 @@ function OwnProfile({ uid, email, profile, details }) {
           <span className="avcam" aria-hidden="true"><CameraIcon size={16} /></span>
           <input type="file" accept="image/*" onChange={e=>{const f=e.target.files?.[0];e.target.value='';if(f)pickAvatar(f)}} disabled={uploading} aria-label="Change profile photo" hidden />
         </label>
-        <div className="who"><b>{profile.fullName}</b><span style={{ color: 'var(--mut)' }}>{uploading ? 'Uploading photo…' : sub}</span></div>
+        <div className="who">
+          <b>{profile.fullName}{isVerifiedProfile(data.stats) && <VerifiedBadge />}</b>
+          <span style={{ color: 'var(--mut)' }}>{uploading ? 'Uploading photo…' : sub}</span>
+          <ProfileFollows key={uid} userId={uid} viewerId={uid} />
+        </div>
         <div className="pro-acts">
           <button className="btn sm ghost" onClick={() => setEditing(v => !v)}>{editing ? 'Close' : <><PencilIcon />Edit profile</>}</button>
           <button className="btn sm" onClick={() => openPost()}>Post your plate</button>
@@ -152,6 +162,54 @@ function OwnProfile({ uid, email, profile, details }) {
       emptyPlates="No plates yet. Tap + to post your first one."
       after={<div className="cacts">{showAdmin === true && <Link className="btn sm" to="/admin">Admin console</Link>}<InstallButton/><button className="btn ghost sm signout" onClick={leave}><LogOutIcon />Sign out</button></div>}
     />
+  )
+}
+
+function ProfileFollows({ userId, viewerId }) {
+  const { cache } = usePost()
+  const { toast } = useFx()
+  const gate = useSignInGate()
+  const key = queryKey('profile-follows', userId)
+  const load = () => fetchFollowSummary(userId)
+  const { data, error, reload } = useQuery(key, load, { enabled: !!supabase })
+  const [busy, setBusy] = useState(false)
+  const [saved, setSaved] = useState(null)
+  const summary = saved && saved.baseline === data ? saved.value : data
+
+  const toggle = async () => {
+    if (!summary || busy || !gate('to follow profiles')) return
+    const next = !summary.viewer_follows
+    setBusy(true)
+    try {
+      await setProfileFollow(userId, viewerId, next)
+      setSaved({
+        baseline: data,
+        value: {
+          ...summary,
+          followers: Math.max(0, Number(summary.followers) + (next ? 1 : -1)),
+          viewer_follows: next,
+        },
+      })
+      cache.invalidate('profile-follows')
+      await cache.load(key, load).catch(error => console.warn('Follow totals could not be refreshed', error.message))
+    } catch (error) {
+      toast(friendly(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (error) return <button type="button" className="cm-action profile-follows-retry" onClick={reload}>Retry follows</button>
+  if (!summary) return null
+  return (
+    <div className="profile-follows">
+      <span>{summary.followers} {Number(summary.followers) === 1 ? 'follower' : 'followers'} · {summary.following} following</span>
+      {userId !== viewerId && (
+        <button type="button" className={`btn sm${summary.viewer_follows ? ' ghost' : ''}`} disabled={busy} onClick={toggle}>
+          {summary.viewer_follows ? 'Unfollow' : 'Follow'}
+        </button>
+      )}
+    </div>
   )
 }
 

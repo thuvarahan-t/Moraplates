@@ -3,9 +3,11 @@ import { supabase } from '../lib/supabase'
 import { photoUrl, uploadPhoto, compressImage } from '../lib/photos'
 import { isMissingSeenSchema, queryWithSeenFallback } from '../lib/optionalSchema'
 import { byVotes } from '../lib/food'
+import { BADGES, isVerifiedProfile } from '../lib/badges'
 
 const need = () => { if (!supabase) throw new Error('This needs a Supabase project. Add keys to .env.') }
 const check = ({ data, error }) => { if (error) throw error; return data }
+const VERIFIED_STATS_FIELDS = ['user_id', ...new Set(BADGES.map(badge => badge.stat))].join(', ')
 
 export const toCanteen = r => ({
   id: r.id, name: r.name, location: r.location, lat: r.lat, lng: r.lng,
@@ -61,7 +63,13 @@ export async function fetchPosts(viewerId, { canteenId, foodId, authorId, postId
   // Keep the actual live posts readable if the seen-history migration is pending.
   // The feed already filters locally remembered post IDs in that case.
   const rows = check(await queryWithSeenFallback(query, !!viewerId && unseen))
-  const mine = new Set(viewerId && rows.length ? check(await supabase.from('likes').select('post_id').eq('user_id', viewerId).in('post_id', rows.map(r => r.id))).map(l => l.post_id) : [])
+  const [likes, badgeStats] = rows.length ? await Promise.all([
+    viewerId ? supabase.from('likes').select('post_id').eq('user_id', viewerId).in('post_id', rows.map(r => r.id)) : { data: [] },
+    supabase.from('profile_stats').select(VERIFIED_STATS_FIELDS).in('user_id', [...new Set(rows.map(r => r.user_id))]),
+  ]) : [{ data: [] }, { data: [] }]
+  const mine = new Set(check(likes).map(l => l.post_id))
+  if (badgeStats.error) console.warn('Post author badges unavailable', badgeStats.error.message)
+  const verified = new Set((badgeStats.data ?? []).filter(isVerifiedProfile).map(r => r.user_id))
   return rows.map(r => ({
     id: r.id,
     userId: r.user_id,
@@ -73,7 +81,7 @@ export async function fetchPosts(viewerId, { canteenId, foodId, authorId, postId
     photoPath: r.photo_path,
     createdIso: r.created_at,
     createdAt: Date.parse(r.created_at),
-    author: { name: r.author?.full_name ?? 'Student', faculty: r.author?.faculty, avatar: photoUrl(r.author?.avatar_path) },
+    author: { name: r.author?.full_name ?? 'Student', faculty: r.author?.faculty, avatar: photoUrl(r.author?.avatar_path), verified: verified.has(r.user_id) },
     food: { name: r.food?.name ?? 'Plate', price: r.food?.price ?? 0 },
     likes: r.likes[0]?.count ?? 0,
     comments: r.comments[0]?.count ?? 0,
@@ -90,16 +98,31 @@ export async function setLike(postId, userId, liked) {
 
 // ---------------------------------------------------------------- comments
 
+const COMMENT_FIELDS = 'id, user_id, body, created_at, author:profiles!comments_user_id_fkey(full_name, avatar_path)'
+
+const toComment = r => ({
+  id: r.id,
+  parentId: r.parent_id ?? null,
+  userId: r.user_id,
+  body: r.body,
+  createdAt: Date.parse(r.created_at),
+  author: r.author?.full_name ?? 'Student',
+  avatar: photoUrl(r.author?.avatar_path),
+})
+
 export async function fetchComments(postId) {
   need()
-  const rows = check(await supabase.from('comments')
-    .select('id, user_id, body, created_at, author:profiles(full_name, avatar_path)')
-    .eq('post_id', postId).order('created_at'))
-  return rows.map(r => ({ id: r.id, userId: r.user_id, body: r.body, createdAt: Date.parse(r.created_at), author: r.author?.full_name ?? 'Student', avatar: photoUrl(r.author?.avatar_path) }))
+  const read = fields => supabase.from('comments').select(fields).eq('post_id', postId).order('created_at').order('id')
+  const result = await read(COMMENT_FIELDS + ', parent_id')
+  const missingParent = ['42703', 'PGRST204'].includes(result.error?.code) && /\bparent_id\b/i.test(result.error.message)
+  const rows = check(missingParent ? await read(COMMENT_FIELDS) : result)
+  return { list: rows.map(toComment), repliesEnabled: !missingParent }
 }
-export async function addComment(postId, body) {
+export async function addComment(postId, body, parentId) {
   need()
-  check(await supabase.from('comments').insert({ post_id: postId, body }))
+  const payload = { post_id: postId, body, ...(parentId ? { parent_id: parentId } : {}) }
+  const row = check(await supabase.from('comments').insert(payload).select(COMMENT_FIELDS).single())
+  return toComment({ ...row, parent_id: parentId })
 }
 export async function deleteComment(id) {
   need()
@@ -249,6 +272,21 @@ export async function fetchPublicProfile(userId, viewerId) {
     stats: check(stats),
     posts,
   }
+}
+
+export async function fetchFollowSummary(userId) {
+  need()
+  const result = await supabase.rpc('profile_follow_summary', { target: userId }).single()
+  if (result.error?.code === 'PGRST202') return null
+  return check(result)
+}
+
+export async function setProfileFollow(userId, viewerId, following) {
+  need()
+  const follows = supabase.from('profile_follows')
+  check(following
+    ? await follows.upsert({ followed_id: userId }, { onConflict: 'follower_id,followed_id', ignoreDuplicates: true })
+    : await follows.delete().eq('follower_id', viewerId).eq('followed_id', userId))
 }
 
 /** Uploads a new profile picture and removes the old file. */

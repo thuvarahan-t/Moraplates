@@ -6,6 +6,7 @@ import Comments from './Comments'
 import { CommentIcon, HeartIcon } from './icons'
 import { RATING, timeAgo } from '../lib/format'
 import Avatar from './Avatar'
+import VerifiedBadge from './VerifiedBadge'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import { useFx } from '../lib/fx'
@@ -56,7 +57,7 @@ export default function PostCard({ post, canteen, index = 0, onLike, onSeen, onD
     <div className="pb ptop"><div className="ph">
       <Link className="ph-who" to={post.userId ? '/u/'+post.userId : '/people'}>
         <Avatar name={post.author.name} url={post.author.avatar}/>
-        <span className="who"><b>{post.author.name}</b><small>{post.author.faculty ? post.author.faculty + ' · ' : ''}{timeAgo(post.createdAt)}</small></span>
+        <span className="who"><b>{post.author.name}{post.author.verified && <VerifiedBadge />}</b><small>{post.author.faculty ? post.author.faculty + ' · ' : ''}{timeAgo(post.createdAt)}</small></span>
       </Link>
       <span className={'rt '+cls}>{label}</span>
       {own && <button className="social-icon" disabled={busy} aria-label="Delete your post" onClick={remove}><Trash2 size={19}/></button>}

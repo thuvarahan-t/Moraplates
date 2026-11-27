@@ -20,3 +20,6 @@ export const badgesFor = stats =>
     const have = stats?.[b.stat] ?? 0
     return { ...b, have: Math.min(have, b.goal), earned: have >= b.goal }
   })
+
+export const VERIFIED_BADGE_COUNT = 4
+export const isVerifiedProfile = stats => badgesFor(stats).filter(badge => badge.earned).length >= VERIFIED_BADGE_COUNT
