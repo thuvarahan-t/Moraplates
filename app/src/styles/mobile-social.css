@@ -85,6 +85,33 @@ input,textarea,select{font-size:16px!important}
 .canteen-list-item{display:flex;align-items:center;overflow:hidden}
 .canteen-list-item .ccard{flex:1;min-width:0}
 .canteen-share{margin-right:8px}
+.canteen-photo-placeholder{display:grid}
+.canteen-photo-placeholder > *{grid-area:1 / 1}
+.canteen-photo-placeholder .dish{height:100%}
+.canteen-photo-placeholder > button{
+  position:relative;
+  display:flex;
+  align-items:flex-end;
+  border:0;
+  padding:14px;
+  background:none;
+  cursor:pointer;
+  touch-action:manipulation;
+}
+.canteen-photo-placeholder > button:focus-visible{outline-offset:-4px}
+.canteen-photo-placeholder > button:disabled{cursor:wait}
+.canteen-photo-label{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:6px 10px;
+  border-radius:999px;
+  background:var(--card);
+  color:var(--brand);
+  font-size:13px;
+  font-weight:700;
+}
+.canteen-photo-placeholder > button:hover .canteen-photo-label{background:var(--chip)}
 .canteen-actions{align-items:center}
 .canteen-action-icons{
   display:inline-flex;
@@ -96,6 +123,7 @@ input,textarea,select{font-size:16px!important}
   background:var(--card);
 }
 .canteen-action-icons .social-icon{border-radius:50%}
+.canteen-action-icons .social-icon[aria-pressed=true] svg{fill:currentColor}
 .canteen-photo-spinner{animation:spin .85s linear infinite}
 .cbanner .canteen-action-icons{
   background:rgb(26 13 15 / .28);

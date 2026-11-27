@@ -14,7 +14,6 @@ import { CANTEEN_GALLERY_KEY, fetchCanteenGallery } from '../data/queries'
 import { supabase } from '../lib/supabase'
 import { byVotes, hourLabel, isOpen, isReportedClosed, isReportedOpen, ratingChip, superPercent } from '../lib/food'
 import { useSignInGate } from '../lib/useSignInGate'
-import { plural } from '../lib/format'
 
 const SORTS = [['votes', 'Top voted'], ['open', 'Open now'], ['cheap', 'Cheapest']]
 
@@ -34,7 +33,7 @@ export default function Canteens() {
   const { data: photos } = useQuery(CANTEEN_GALLERY_KEY, fetchCanteenGallery, { enabled: !!supabase })
   const thumbs = firstPhotoByCanteen(photos)
 
-  const max = Math.max(1, ...canteens.map(c => c.votes))
+  const totalVotes = canteens.reduce((total, canteen) => total + canteen.votes, 0)
   const minPrice = c => Math.min(...foods.filter(f => f.canteenId === c.id).map(f => f.price))
   const nameOf = id => canteens.find(c => c.id === id)?.name ?? ''
 
@@ -89,6 +88,7 @@ export default function Canteens() {
           </div>
         )}
         {list.map((c, i) => {
+          const voteShare = totalVotes ? Math.round((c.votes / totalVotes) * 100) : 0
           const open = isOpen(c,now)
           const status = isReportedClosed(c, now) ? 'Reported closed' : isReportedOpen(c, now) ? 'Reported open' : open ? 'Open now' : 'Closed'
           return (
@@ -99,7 +99,10 @@ export default function Canteens() {
                 {c.knownFor && <small>Known for {c.knownFor.toLowerCase()}</small>}
                 <small className="loc"><LocationIcon />{c.location}</small>
                 <div><span className={'open ' + (open ? 'y' : 'n')}>{status} · {hourLabel(c.opensAt)} to {hourLabel(c.closesAt)}</span></div>
-                <div className="bar"><i style={{ '--w': Math.round((c.votes / max) * 100) + '%' }} /></div>
+                <div className="canteen-vote-share">
+                  <div className="bar" aria-hidden="true"><i style={{ '--w': `${voteShare}%` }} /></div>
+                  <small>{voteShare}%<span className="sr"> of votes</span></small>
+                </div>
               </div>
             </Link><button className="social-icon canteen-share" aria-label={'Share '+c.name} onClick={async()=>{if(await shareLink('/canteens/'+c.id,c.name+' · MoraPlates')==='copied')toast('Canteen link copied')}}><Share2 size={19}/></button></div>
           )

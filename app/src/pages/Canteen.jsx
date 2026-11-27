@@ -133,6 +133,10 @@ export default function Canteen() {
     }
   }
 
+  const choosePhoto = () => {
+    if (gate('to add photos')) photoInput.current?.click()
+  }
+
   const deletePhoto = async p => {
     if (!window.confirm('Delete this photo?')) return
     try {
@@ -153,12 +157,20 @@ export default function Canteen() {
       <p>{c.location} · <span className={'open ' + (open ? 'y' : 'n')}>{status}, {hourLabel(c.opensAt)} to {hourLabel(c.closesAt)}</span></p>
       {c.knownFor && <p>Known for {c.knownFor.toLowerCase()}</p>}
       <div className="cacts canteen-actions">
-        <button ref={voteBtn} className={'btn' + (fav ? ' voted' : '')} aria-pressed={fav} onClick={vote} disabled={voting}>
-          {fav ? <><CheckIcon />Your favourite canteen</> : <><HeartIcon />Vote as my favourite</>}
-        </button>
+        {!photos.length && (
+          <button ref={voteBtn} className={'btn' + (fav ? ' voted' : '')} aria-pressed={fav} onClick={vote} disabled={voting}>
+            {fav ? <><CheckIcon />Your favourite canteen</> : <><HeartIcon />Vote as my favourite</>}
+          </button>
+        )}
         <div className="canteen-action-icons" role="group" aria-label="Canteen actions">
+          {photos.length > 0 && (
+            <button ref={voteBtn} type="button" className="social-icon" aria-label="Vote as my favourite"
+              title={fav ? 'Your favourite canteen' : 'Vote as my favourite'} aria-pressed={fav} onClick={vote} disabled={voting}>
+              <HeartIcon size={19} />
+            </button>
+          )}
           <button type="button" className="social-icon" aria-label={photoActionLabel} title={photoActionLabel} disabled={photoBusy}
-            onClick={() => { if (gate('to add photos')) photoInput.current?.click() }}>
+            onClick={choosePhoto}>
             {photoBusy ? <LoaderCircle className="canteen-photo-spinner" size={19} aria-hidden="true" /> : <CameraIcon size={19} />}
           </button>
           <input ref={photoInput} type="file" accept="image/*" aria-label="Add canteen photo" disabled={photoBusy} hidden
@@ -202,7 +214,15 @@ export default function Canteen() {
         </div>
       ) : (
         <div className="card chero rise" style={{ '--cc': c.colour }}>
-          <Dish name={c.knownFor || menu[0]?.name || c.name} colour={c.colour} />
+          <div className="canteen-photo-placeholder">
+            <div aria-hidden="true"><Dish name={c.knownFor || menu[0]?.name || c.name} colour={c.colour} /></div>
+            <button type="button" onClick={choosePhoto} disabled={photoBusy}>
+              <span className="canteen-photo-label">
+                {photoBusy ? <LoaderCircle className="canteen-photo-spinner" size={19} aria-hidden="true" /> : <CameraIcon size={19} />}
+                {photoActionLabel}
+              </span>
+            </button>
+          </div>
           {info}
         </div>
       )}
