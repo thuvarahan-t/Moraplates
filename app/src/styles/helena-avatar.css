@@ -1,0 +1,218 @@
+.helena-avatar {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  width: var(--helena-avatar-size, 54px);
+  height: var(--helena-avatar-size, 54px);
+  isolation: isolate;
+}
+
+.helena-avatar-disc {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 22%, #ffecd0, #f3b97b);
+}
+
+.helena-avatar :is(.helena-avatar-hair, .helena-avatar-coat, .helena-avatar-face,
+  .helena-avatar-sleeve, .helena-avatar-spoon, .helena-avatar-hand, .helena-avatar-hat, .helena-avatar-steam) {
+  position: absolute;
+}
+
+.helena-avatar-hair {
+  inset: 22% 19% 10%;
+  border-radius: 46% 48% 32% 32% / 39% 43% 42% 42%;
+  background: linear-gradient(130deg, #4b2a28 20%, #362023 70%);
+}
+
+.helena-avatar-coat {
+  inset: 72% 13% -10%;
+  border-radius: 45% 45% 0 0;
+  background: linear-gradient(125deg, #be5050, #8b2d40 80%);
+}
+
+.helena-avatar-coat::after {
+  position: absolute;
+  content: '';
+  inset: 12% 34% 0;
+  background: #fff6e7;
+  clip-path: polygon(0 20%, 50% 38%, 100% 20%, 87% 100%, 11% 100%);
+}
+
+.helena-avatar-face {
+  inset: 32% 26% 23%;
+  border-radius: 41% 41% 48% 48%;
+  background:
+    radial-gradient(ellipse at 19% 65%, #df8270 0 9%, transparent 12%),
+    radial-gradient(ellipse at 81% 65%, #df8270 0 9%, transparent 12%),
+    linear-gradient(140deg, #ffd1a0, #eea477 85%);
+}
+
+.helena-avatar-face::before {
+  position: absolute;
+  content: '';
+  inset: -14% 32% 64% -4%;
+  border-radius: 55% 32% 66% 12%;
+  background: #432525;
+  transform: rotate(-12deg);
+}
+
+.helena-avatar-eyes {
+  position: absolute;
+  inset: 43% 24% 42%;
+  animation: helena-eye-blink 5.8s infinite ease-in-out;
+}
+
+.helena-avatar-eyes::before,
+.helena-avatar-eyes::after {
+  position: absolute;
+  content: '';
+  width: 21%;
+  height: 100%;
+  border-radius: 50%;
+  background: #3b2223;
+}
+
+.helena-avatar-eyes::before { left: 0; }
+.helena-avatar-eyes::after { right: 0; }
+
+.helena-avatar-smile {
+  position: absolute;
+  inset: 67% 38% 20%;
+  border-radius: 18% 18% 60% 60%;
+  background: linear-gradient(#893d35 56%, #da796c 56%);
+}
+
+.helena-avatar-sleeve {
+  inset: 76% 14% 8% 62%;
+  border-radius: 50% 42% 40% 34%;
+  background: #a13749;
+  rotate: -39deg;
+}
+
+.helena-avatar-spoon {
+  inset: 43% 9% 16% 74%;
+  transform: rotate(21deg);
+  transform-origin: 50% 76%;
+}
+
+.helena-avatar-spoon::before,
+.helena-avatar-spoon::after {
+  position: absolute;
+  content: '';
+}
+
+.helena-avatar-spoon::before {
+  inset: 0 0 60%;
+  border: 1px solid #825035;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 44% 36%, #edbc82, #ac754c 84%);
+}
+
+.helena-avatar-spoon::after {
+  inset: 34% 39% 0;
+  border-radius: 999px;
+  background: #825035;
+}
+
+.helena-avatar-hand {
+  inset: 72% 11% 15% 74%;
+  border: 1px solid #c57558;
+  border-radius: 47% 45% 50% 38%;
+  background: linear-gradient(150deg, #ffd1a0, #ebaa7b);
+  rotate: -24deg;
+}
+
+.helena-avatar-hat {
+  inset: 9% 27% 71%;
+  border-radius: 23% 23% 18% 18%;
+  background: linear-gradient(#fffaf0 57%, #f3e4d3 57%);
+  filter: drop-shadow(0 1px 1px rgb(92 49 34 / .17));
+}
+
+.helena-avatar-hat::before {
+  position: absolute;
+  content: '';
+  inset: -48% -16% 24%;
+  border-radius: 40% 40% 37% 37%;
+  background: #fffaf0;
+}
+
+.helena-avatar-hat::after {
+  position: absolute;
+  content: '';
+  inset: -102% 19% 17%;
+  border-radius: 52% 52% 36% 36%;
+  background: #fffdf7;
+}
+
+.helena-avatar-steam {
+  inset: -28% 32% 98%;
+  pointer-events: none;
+}
+
+.helena-avatar-steam > span {
+  position: absolute;
+  bottom: 3%;
+  left: 18%;
+  width: 30%;
+  height: 70%;
+  border-left: max(1px, calc(var(--helena-avatar-size) * .03)) solid #a77460;
+  border-radius: 58% 0 0 56%;
+  opacity: 0;
+  animation: helena-steam-rise 2.9s ease-out infinite;
+}
+
+.helena-avatar-steam > span::after {
+  position: absolute;
+  content: '';
+  inset: 25% -11% -14% 20%;
+  border-right: max(1px, calc(var(--helena-avatar-size) * .03)) solid #a77460;
+  border-radius: 0 58% 53% 0;
+}
+
+.helena-avatar-steam > span + span {
+  left: 56%;
+  height: 56%;
+  animation-delay: -1.45s;
+}
+
+@keyframes helena-steam-rise {
+  from { opacity: 0; transform: translateY(48%) scale(.7) rotate(13deg); }
+  30% { opacity: .78; }
+  to { opacity: 0; transform: translate(18%, -58%) scale(1.1) rotate(-18deg); }
+}
+
+@keyframes helena-eye-blink {
+  0%, 22%, 27%, 71%, 76%, 100% { transform: scaleY(1); }
+  24.5%, 73.5% { transform: scaleY(.12); }
+}
+
+@media (min-width: 761px) {
+  .helena-avatar-disc { box-shadow: 0 2px 5px rgb(81 43 32 / .19); }
+
+  .helena-avatar-steam {
+    --helena-steam-stroke: max(2px, calc(var(--helena-avatar-size) * .045));
+    z-index: 1;
+    inset: -32% 27% 88%;
+    filter: drop-shadow(0 1px 1px rgb(82 44 32 / .62));
+  }
+
+  .helena-avatar-steam > span {
+    border-left: var(--helena-steam-stroke) solid #fff8ed;
+    animation-duration: 3.2s;
+    animation-delay: -.8s;
+  }
+
+  .helena-avatar-steam > span::after {
+    border-right: var(--helena-steam-stroke) solid #fff8ed;
+  }
+
+  .helena-avatar-steam > span + span { animation-delay: -2.4s; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .helena-avatar-eyes { animation: none; }
+  .helena-avatar-steam > span { animation: none; opacity: .5; }
+}

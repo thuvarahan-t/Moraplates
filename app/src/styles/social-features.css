@@ -24,10 +24,6 @@
 .profile-follows .btn { min-height: 36px }
 .profile-follows-retry { align-self: flex-start }
 
-.cm > div { min-width: 0; overflow-wrap: anywhere }
-.cm-reply { margin-inline-start: clamp(16px, 4vw, 28px) }
-.cm-reply .cm-reply-target { display: block; margin: 2px 0 0 }
-.cm-actions { display: flex; gap: 12px }
 .cm-action {
   min-height: 26px;
   padding: 2px 0;
@@ -42,15 +38,3 @@
 
 .cm-action:hover { text-decoration: underline }
 .cm-action:disabled { opacity: .55; cursor: default }
-.cm-replying {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding-inline: 8px;
-  color: var(--mut);
-  overflow-wrap: anywhere;
-  font-size: .8rem;
-}
-
-.cbox input { min-width: 0 }

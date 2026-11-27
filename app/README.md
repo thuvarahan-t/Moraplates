@@ -20,6 +20,12 @@ npm run dev
 
 With no Supabase keys the app runs on the sample data from the handoff (`src/data/sample.js`).
 
+## Configure Helena
+
+Create a Gemini API key in [Google AI Studio](https://aistudio.google.com/api-keys). Set `GEMINI_API_KEY` in `app/.env.local` and restart Vite. On Vercel, set the same server environment variable and redeploy. The assistant requires an existing `@uom.lk` sign-in and uses the configured Supabase public canteen and menu views.
+
+Tap **Helena**, the chef icon at the bottom right, to ask in English, Tamil, Sinhala, Tanglish, or romanized Sinhala. Helena follows the language of each question and remembers explicit language preferences in the current browser tab. The student's name stays in the browser and appears in greetings. Gemini interprets the question using up to eight relevant recent exchanges and public catalog labels. The server uses current Supabase records to write the answer.
+
 ## Configure Google Maps
 
 Enable the Maps JavaScript API with billing in Google Cloud. Set `VITE_GOOGLE_MAPS_API_KEY` to a browser key restricted to the app's origins and the Maps JavaScript API. Set `VITE_GOOGLE_MAPS_MAP_ID` to a JavaScript map ID for the deployed app. The app uses Google's demo map ID during local testing when this value is empty. Rebuild after changing these variables. Without a working browser key, interactive maps use OpenStreetMap and canteen directions still open in Google Maps. [Google Maps setup](https://developers.google.com/maps/documentation/javascript/get-api-key)

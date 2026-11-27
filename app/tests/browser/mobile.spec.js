@@ -125,7 +125,7 @@ test('the last canteen option stays tappable above the navigation on a short pho
   await expect(canteen).toHaveAccessibleDescription('Hostel canteen')
 })
 
-test('the last unseen plate automatically brings back the past feed', async ({ page }) => {
+test('scrolling past the last unseen plate appends history below it', async ({ page }) => {
   await page.addInitScript(() => {
     const key = 'moraplates:seen:v1:guest'
     if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify(['1', '2', '3', '4', '5', '6']))
@@ -138,10 +138,12 @@ test('the last unseen plate automatically brings back the past feed', async ({ p
   await expect(cards.first().locator('.post-food')).toContainText('Cheese kottu')
   await expect(caughtUp).toHaveCount(0)
 
-  await cards.first().scrollIntoViewIfNeeded()
+  await page.locator('.feed-page-status').scrollIntoViewIfNeeded()
   await expect(caughtUp).toBeVisible()
   await expect(cards).toHaveCount(7)
-  await expect(cards.first().locator('.post-food')).toContainText('Chicken kottu')
+  await expect(cards.first().locator('.post-food')).toContainText('Cheese kottu')
+  await expect(cards.nth(1).locator('.post-food')).toContainText('Chicken kottu')
+  await expect(page.locator('#feed .posts > .social-post + .feed-caught-up')).toHaveCount(1)
 
   await page.getByRole('button', { name: 'Refresh', exact: true }).click()
   await expect(caughtUp).toBeVisible()
