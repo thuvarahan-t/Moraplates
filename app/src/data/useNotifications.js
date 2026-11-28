@@ -102,7 +102,8 @@ export function useNotifications({ open }) {
   }
 
   return {
-    unreadCount: unread.data ?? 0,
+    unreadCount: unread.data?.count ?? 0,
+    latestUnread: unread.data?.latest,
     notifications,
     loading: inbox.loading,
     error: inbox.error || more?.error,

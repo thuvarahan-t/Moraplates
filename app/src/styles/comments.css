@@ -28,6 +28,7 @@ dialog.cm-dialog[open] {
 }
 
 .cm-header h2 { font-size: 20px }
+.cm-header h2[tabindex="-1"]:focus { outline: none }
 
 .cm-close {
   display: grid;

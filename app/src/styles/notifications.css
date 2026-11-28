@@ -37,6 +37,51 @@
 .notification-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--brand) }
 .notification-more { display: flex; justify-content: center; padding: 0 12px 12px }
 
+.notification-preview-region {
+  position: fixed;
+  z-index: 45;
+  inset: calc(env(safe-area-inset-top, 0px) + 10px) 12px auto;
+  display: grid;
+  justify-items: center;
+  pointer-events: none;
+}
+.notification-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(100%, 360px);
+  padding: 9px 13px 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  box-shadow: 0 7px 24px rgba(29, 16, 18, .14);
+  background: var(--card);
+  color: var(--ink);
+  font-size: .875rem;
+  line-height: 1.35;
+  text-decoration: none;
+  pointer-events: auto;
+  animation: notification-preview var(--notification-preview-duration) both;
+}
+.notification-preview-icon {
+  display: grid;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 11px;
+  background: var(--chip);
+  color: var(--brand);
+}
+.notification-preview-text { overflow-wrap: anywhere }
+@keyframes notification-preview {
+  0% { opacity: 0; transform: translateY(-12px); animation-timing-function: ease-out }
+  6%, 94% { opacity: 1; transform: translateY(0); animation-timing-function: ease-in }
+  100% { opacity: 0; transform: translateY(-8px) }
+}
+@media (prefers-reduced-motion: reduce) {
+  .notification-preview { animation: none }
+}
+
 @media (min-width: 761px) and (max-width: 900px) {
   .hw:has(> .notification-bell) { gap: 10px }
   .hw:has(> .notification-bell) .tabs a { padding-inline: 11px }

@@ -4,6 +4,8 @@ import { startModerationTestServer, supabaseUrl, useTestSession } from './modera
 const userId = '4ea0d758-3629-48de-b553-f3634471effc'
 const actorId = 'cd621ec9-f96f-44cf-a884-af6df0dd9bdc'
 const postId = '30f51afb-11b0-4b62-81e7-9267db8c853b'
+const parentId = '30459865-21b0-4d32-b560-6a45a28d4639'
+const replyId = 'a051cc9e-9131-4011-9d9b-617a7c840fb7'
 let server
 
 test.use({ viewport: { width: 390, height: 760 }, isMobile: true, hasTouch: true })
@@ -37,7 +39,7 @@ async function openFeed(page, viewerId) {
         return route.fulfill({ json: updated })
       }
       noticeReads += 1
-      if (request.method() === 'HEAD') return route.fulfill({ headers: {
+      if (searchParams.get('read_at') === 'is.null') return route.fulfill({ json: unread().slice(0, 1), headers: {
         'content-range': `*/${unread().length}`,
         'access-control-expose-headers': 'content-range',
       } })
@@ -46,6 +48,14 @@ async function openFeed(page, viewerId) {
     if (request.method() === 'HEAD') return route.fulfill({ headers: { 'content-range': '*/0' } })
     if (pathname === '/rest/v1/rpc/is_content_moderator') return route.fulfill({ json: false })
     if (pathname === '/rest/v1/profiles') return route.fulfill({ json: { id: userId, full_name: 'Signed-in Student' } })
+    if (pathname === '/rest/v1/posts') return route.fulfill({ json: [{
+      id: postId, user_id: actorId, canteen_id: 'it', rating: 'super', caption: 'Lunch today', created_at: now,
+      author: actor, food: { name: 'Fried rice', price: 200 }, likes: [], comments: [{ count: 2 }],
+    }] })
+    if (pathname === '/rest/v1/comments') return route.fulfill({ json: [
+      { id: parentId, parent_id: null, user_id: userId, author: { full_name: 'Signed-in Student' }, body: 'Is this spicy?', created_at: now },
+      { id: replyId, parent_id: parentId, user_id: actorId, author: actor, body: 'Only a little.', created_at: now },
+    ] })
     return route.fulfill({ json: [] })
   })
   await page.goto(server.resolvedUrls.local[0], { waitUntil: 'domcontentloaded' })
@@ -90,9 +100,17 @@ test('students can open, read, and clear their follow and like notifications', a
   await expect(dialog.getByRole('button', { name: 'Mark all as read' })).toHaveCount(0)
   await dialog.getByRole('button', { name: 'Close notifications' }).tap()
   await expect(page.getByRole('button', { name: 'Notifications', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Notifications', exact: true }).tap()
+  const close = dialog.getByRole('button', { name: 'Close notifications' })
+  await expect(dialog.getByRole('heading', { name: 'Notifications' })).toBeFocused()
+  await expect(close).toHaveCSS('outline-style', 'none')
+  await page.keyboard.press('Tab')
+  await expect(close).toBeFocused()
+  await expect(close).toHaveCSS('outline-style', 'solid')
 })
 
 test('a private update refreshes the unread badge while the list is closed', async ({ page }) => {
+  await page.clock.install()
   let subscription
   await page.routeWebSocket(`${supabaseUrl.replace(/^https:/, 'wss:')}/realtime/v1/websocket**`, socket => {
     socket.onMessage(raw => {
@@ -109,6 +127,8 @@ test('a private update refreshes the unread badge while the list is closed', asy
   await expect(page.getByRole('button', { name: 'Notifications, 2 unread' })).toBeVisible()
   await expect.poll(() => subscription?.topic).toBe(`realtime:notifications:${userId}`)
   expect(subscription.payload.config.private).toBe(true)
+  const preview = page.locator('.notification-preview')
+  await expect(preview).toHaveCount(0)
 
   rows.unshift({ ...rows[0], id: 3 })
   subscription.socket.send(JSON.stringify({ topic: subscription.topic, event: 'broadcast', ref: null,
@@ -116,6 +136,30 @@ test('a private update refreshes the unread badge while the list is closed', asy
 
   await expect(page.getByRole('button', { name: 'Notifications, 3 unread' })).toBeVisible()
   await expect(page.getByRole('dialog', { name: 'Notifications' })).toHaveCount(0)
+  await expect(preview).toContainText('Plate Friend liked your post.')
+  await page.clock.fastForward(3500)
+  await expect(preview).toHaveCount(0)
+})
+
+test('a reply alert opens the matching comment thread', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.clock.install()
+  const { rows } = await openFeed(page, userId)
+  await expect(page.getByRole('button', { name: 'Notifications, 2 unread' })).toBeVisible()
+  const newReply = { ...rows[0], id: 3, kind: 'reply', comment_id: replyId }
+  rows.unshift(newReply)
+  await page.clock.fastForward(15_000)
+  const preview = page.locator('.notification-preview')
+  await expect(preview).toBeVisible()
+  await expect(preview).toContainText('Plate Friend replied to your comment.')
+  await expect(preview).toHaveAttribute('href', `/posts/${postId}?comment=${replyId}`)
+  await preview.tap()
+  const comments = page.getByRole('dialog', { name: 'Comments' })
+  await expect(comments.getByText('Only a little.')).toBeVisible()
+  await expect(comments.getByRole('button', { name: 'Hide replies' })).toHaveAttribute('aria-expanded', 'true')
+  await expect.poll(() => Boolean(newReply.read_at)).toBe(true)
+  await comments.getByRole('button', { name: 'Close comments' }).tap()
+  await expect(page).toHaveURL(new RegExp(`/posts/${postId}$`))
 })
 
 test('the visible app refreshes notifications when Realtime is unavailable', async ({ page }) => {
@@ -126,4 +170,38 @@ test('the visible app refreshes notifications when Realtime is unavailable', asy
   rows.unshift({ ...rows[0], id: 3 })
   await page.clock.fastForward(15_000)
   await expect(page.getByRole('button', { name: 'Notifications, 3 unread' })).toBeVisible()
+})
+
+test('phone alerts can be enabled and disabled from the notification sheet', async ({ page }) => {
+  const subscription = {
+    endpoint: 'https://web.push.apple.com/QAFakeEndpoint',
+    keys: { p256dh: `B${'A'.repeat(86)}`, auth: 'A'.repeat(22) },
+  }
+  await page.addInitScript(value => {
+    window.PushManager ??= class {}
+    window.Notification ??= class {}
+    const device = { endpoint: value.endpoint, toJSON: () => value, unsubscribe: async () => true }
+    Object.defineProperty(navigator, 'serviceWorker', { value: {
+      ready: Promise.resolve({ pushManager: { getSubscription: async () => null, subscribe: async () => device } }),
+    } })
+  }, subscription)
+  await openFeed(page, userId)
+  const registered = []
+  const unregistered = []
+  await page.route(`${supabaseUrl}/rest/v1/rpc/web_push_*`, route => {
+    const request = route.request()
+    if (request.url().endsWith('/web_push_public_key')) return route.fulfill({ json: subscription.keys.p256dh })
+    if (request.url().endsWith('/web_push_register')) registered.push(request.postDataJSON())
+    if (request.url().endsWith('/web_push_unregister')) unregistered.push(request.postDataJSON())
+    return route.fulfill({ status: 204 })
+  })
+
+  await page.getByRole('button', { name: 'Notifications, 2 unread' }).tap()
+  const setting = page.getByRole('region', { name: 'Device notifications' })
+  await setting.getByRole('button', { name: 'Enable' }).tap()
+  await expect(setting.getByText('Enabled on this device.')).toBeVisible()
+  expect(registered).toEqual([{ push_endpoint: subscription.endpoint, push_p256dh: subscription.keys.p256dh, push_auth: subscription.keys.auth }])
+  await setting.getByRole('button', { name: 'Turn off' }).tap()
+  await expect(setting.getByRole('button', { name: 'Enable' })).toBeVisible()
+  expect(unregistered).toEqual([{ push_endpoint: subscription.endpoint }])
 })
