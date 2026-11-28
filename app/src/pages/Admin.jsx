@@ -1,5 +1,6 @@
 import {useEffect,useState} from 'react'
 import {ShieldCheck,Plus,Pencil,Trash2} from 'lucide-react'
+import AdminAccounts from '../components/AdminAccounts'
 import {Link} from '../components/NavLinks'
 import {useAdmin} from '../lib/useAdmin'
 import {useFx} from '../lib/fx'
@@ -14,6 +15,7 @@ import {DEFAULT_CANTEEN_HOURS} from '../lib/food'
 import '../styles/admin-canteen.css'
 
 const RESOURCES={
+  accounts:{label:'Accounts'},
   canteens:{label:'Canteens',fields:[['name','Name'],['location','Location'],['lat','Latitude','number'],['lng','Longitude','number'],['known_for','Known for'],['colour','Colour']],create:true},
   foods:{label:'Foods',fields:[['canteen_id','Canteen ID'],['name','Name'],['price','Price (Rs)','number']],create:true},
   posts:{label:'Posts',fields:[['caption','Caption'],['rating','Rating','rating']]},
@@ -97,7 +99,7 @@ export default function Admin(){
   const config=RESOURCES[kind]
   useEffect(()=>{
     let live=true
-    if(!admin.allowed)return
+    if(!admin.allowed || kind === 'accounts')return
     setRows(null);setError('')
     adminList(kind,offset).then(data=>{if(live)setRows(data)}).catch(e=>{if(live)setError(e.message)})
     return()=>{live=false}
@@ -124,8 +126,9 @@ export default function Admin(){
   if(!admin.allowed)return <section className="view"><div className="band"><div className="wrap narrow"><div className="card empty"><h3>Admin access required</h3><p>This area is restricted to approved administrators.</p><Link className="btn sm" to="/profile">Back to profile</Link></div></div></div></section>
   return <section className="view"><div className="band"><div className="wrap narrow">
     <Link className="back" to="/profile">Back to profile</Link>
-    <div className="vh"><div><h2><ShieldCheck size={26}/> Admin console</h2><p>Manage campus food content. Changes affect all students.</p></div></div>
+    <div className="vh"><div><h2><ShieldCheck size={26}/> Admin console</h2><p>Manage accounts and campus food content.</p></div></div>
     <label className="fl card admin-filter"><span>Resource</span><select disabled={busy} value={kind} onChange={e=>{setKind(e.target.value);setOffset(0);setDraft(null)}}>{Object.entries(RESOURCES).map(([key,v])=><option key={key} value={key}>{v.label}</option>)}</select></label>
+    {kind === 'accounts' ? <AdminAccounts /> : <>
     {config.create && <button className="btn sm" onClick={()=>setDraft(newRecord(kind))} disabled={busy}><Plus size={18}/>Add record</button>}
     {draft && <form className="card admin-editor" onSubmit={save}><h3>{draft.id?'Edit record':'New record'}</h3>
       {config.fields.map(([key,label,type])=><label className="fl" key={key}><span>{label}</span>{type==='rating'?<select value={draft[key]||'super'} onChange={e=>setDraft(d=>({...d,[key]:e.target.value}))}>{['super','okay','avoid'].map(v=><option key={v}>{v}</option>)}</select>:<input type={type||'text'} step={type==='number'?'any':undefined} disabled={busy||(kind==='foods'&&key==='canteen_id'&&!!draft.id)} value={draft[key]??''} onChange={e=>setDraft(d=>({...d,[key]:e.target.value}))}/>}</label>)}
@@ -154,6 +157,7 @@ export default function Admin(){
       <div className="admin-actions">{config.fields&&<button className="social-icon" disabled={busy} aria-label="Edit record" onClick={()=>setDraft(editRecord(kind, r))}><Pencil size={18}/></button>}{!config.keep&&<button className="social-icon danger" disabled={busy} aria-label="Delete record" onClick={()=>remove(r)}><Trash2 size={18}/></button>}</div>
     </article>)}</div>
     <div className="cacts"><button className="btn ghost sm" disabled={busy||offset===0} onClick={()=>setOffset(o=>Math.max(0,o-50))}>Previous</button><span>Page {offset/50+1}</span><button className="btn ghost sm" disabled={busy||rows?.length!==50} onClick={()=>setOffset(o=>o+50)}>Next</button></div>
-    <p className="wl-note">Authentication accounts and administrator assignments are managed separately in Supabase by a trusted operator.</p>
+    </>}
+    <p className="wl-note">Administrator assignments are managed in Supabase by a trusted operator.</p>
   </div></div></section>
 }

@@ -1,0 +1,36 @@
+.admin-account-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px;
+}
+
+.admin-account-search .fl { flex: 1 1 210px }
+.admin-account-search .btn { min-height: 48px }
+
+.admin-account-status {
+  display: inline-block;
+  margin-top: 5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--chip);
+  color: var(--mut);
+  font-size: .75rem;
+  font-weight: 700;
+}
+
+.admin-account-status[data-banned] { background: var(--ab); color: var(--at) }
+
+.admin-profile-account {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin: 12px 0;
+  padding: 14px 16px;
+}
+
+.admin-profile-account h3 { font-size: 1rem }
+.admin-profile-email { margin-top: 4px; overflow-wrap: anywhere; font-size: .875rem }
+.admin-profile-email strong { margin-inline-end: 5px }
