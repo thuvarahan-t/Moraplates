@@ -367,14 +367,28 @@ export async function deleteOwnPost(postId, userId) {
   return { storageRemoved: !row.photo_path || await removePostPhoto(row.photo_path) }
 }
 
-export async function fetchPeople(term = '', excludeId, limit = 12) {
+function peopleQuery(term, excludeId, options) {
   need()
-  let q = supabase.from('profiles').select('id, full_name, faculty, batch, avatar_path').order('created_at', { ascending: false }).limit(limit)
+  let q = supabase.from('profiles').select('id, full_name, faculty, batch, avatar_path', options)
+    .order('created_at', { ascending: false }).order('id', { ascending: false })
   if (excludeId) q = q.neq('id', excludeId)
   const clean = term.trim().replace(/[%_*(),]/g, ' ').trim()
   if (clean) q = q.ilike('full_name', '%' + clean + '%')
-  return check(await q).map(r => ({ id:r.id, name:r.full_name, faculty:r.faculty, batch:r.batch, avatar:photoUrl(r.avatar_path) }))
+  return q
 }
+
+const toPerson = r => ({ id: r.id, name: r.full_name, faculty: r.faculty, batch: r.batch, avatar: photoUrl(r.avatar_path) })
+
+export async function fetchPeople(term = '', excludeId, limit = 12) {
+  return check(await peopleQuery(term, excludeId).limit(limit)).map(toPerson)
+}
+
+export async function fetchPeoplePage(term, excludeId, page, pageSize) {
+  const start = page * pageSize
+  const result = await peopleQuery(term, excludeId, { count: 'exact' }).range(start, start + pageSize - 1)
+  return { rows: check(result).map(toPerson), total: result.count }
+}
+
 const CANTEEN_STATUS_RPC = {
   closed: 'report_canteen_closed_today',
   open: 'report_canteen_open',
