@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { REDUCED_MOTION } from '../lib/motion'
 
 /**
@@ -7,18 +7,21 @@ import { REDUCED_MOTION } from '../lib/motion'
  */
 export default function Slideshow({ photos, interval = 4500, children }) {
   const [i, setI] = useState(0)
+  const slides = useRef(null)
   const n = photos.length
 
   useEffect(() => {
     if (REDUCED_MOTION || n < 2) return
-    const t = setInterval(() => { if (!document.hidden) setI(x => (x + 1) % n) }, interval)
+    const t = setInterval(() => {
+      if (!document.hidden && !slides.current?.parentElement.matches(':hover, :focus-within')) setI(x => (x + 1) % n)
+    }, interval)
     return () => clearInterval(t)
   }, [n, interval])
 
   const idx = n ? i % n : 0
   return (
     <>
-      <div className="slides" aria-hidden="true">
+      <div ref={slides} className="slides" aria-hidden="true">
         {photos.map((p, k) => <img key={p.id} src={p.url} alt="" className={k === idx ? 'on' : undefined} loading={k < 2 ? 'eager' : 'lazy'} />)}
       </div>
       {n > 0 && children?.(photos[idx], idx, setI)}

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router'
 import EditFoodButton from '../components/EditFoodButton'
-import { BackIcon } from '../components/icons'
+import { BackIcon, TrashIcon } from '../components/icons'
 import Loader from '../components/Loader'
 import { Link } from '../components/NavLinks'
 import PostCard from '../components/PostCard'
@@ -13,6 +13,7 @@ import { useQuery } from '../data/useQuery'
 import { useAuth } from '../lib/auth'
 import { usePost } from '../lib/post'
 import { supabase } from '../lib/supabase'
+import { useCanteenRemoval } from '../lib/useCanteenRemoval'
 
 const PAGE_SIZE = 20
 
@@ -43,6 +44,7 @@ export default function FoodPosts() {
 function FoodPlateList({ canteen, food }) {
   const { openPost, cache } = usePost()
   const { session } = useAuth()
+  const removal = useCanteenRemoval()
   const opts = { canteenId: canteen.id, foodId: food.id, limit: PAGE_SIZE }
   const fetchPage = before => supabase
     ? fetchPosts(session?.user.id, { ...opts, before })
@@ -94,6 +96,17 @@ function FoodPlateList({ canteen, food }) {
           <button type="button" className="btn sm" onClick={() => openPost(canteen.id, food.id)}>Post this plate</button>
         </div>
       </div>
+      {removal.allowed && food.photoPath && food.photo && (
+        <div className="card food-moderation-photo">
+          <img src={food.photo} alt={`Menu photo for ${food.name}`} />
+          <button type="button" className="mini canteen-delete-action" disabled={removal.busy}
+            onClick={() => removal.remove('food_photos', food.id, {
+              confirmation: `Delete the menu photo for ${food.name}?`,
+              success: 'Menu photo deleted',
+              photoPath: food.photoPath,
+            })}><TrashIcon size={18} />Delete menu photo</button>
+        </div>
+      )}
       {loading && <Loader label="Loading plates" />}
       {error && <div className="card empty"><h3>Couldn't load plates</h3><button type="button" className="btn sm" onClick={reload}>Retry</button></div>}
       {data && !posts.length && <div className="card empty"><h3>No plates yet</h3><p>Post the first plate of {food.name}.</p></div>}

@@ -7,7 +7,7 @@ From app:
 - npx playwright install chromium
 - npx playwright test
 
-Browser tests use the demo data (leave VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY unset). They exercise mobile routes, seen history, sharing, profile search and the image crop UI. They do not prove a real Storage upload or server authorization.
+Browser tests use demo data (leave VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY unset) or mocked Supabase responses for moderation. They exercise mobile routes, seen history, sharing, profile search, image cropping and deletion controls. The local Supabase integration test verifies database permissions and Storage cleanup.
 
 Run `node tests/integration/helena-conversations.mjs` from `app` with the Gemini and Supabase settings configured. It uses fixture menus for multilingual conversation checks and reads the configured public catalog for the budget and recommendation conversation.
 

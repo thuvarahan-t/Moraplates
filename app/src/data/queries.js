@@ -14,7 +14,7 @@ export const toCanteen = r => ({
   opensAt: r.opens_minute == null ? r.opens_at : r.opens_minute / 60,
   closesAt: r.closes_minute == null ? r.closes_at : r.closes_minute / 60,
   knownFor: r.known_for, colour: r.colour,
-  photo: photoUrl(r.photo_path), votes: r.votes_this_week ?? 0,
+  photo: photoUrl(r.photo_path), photoPath: r.photo_path, votes: r.votes_this_week ?? 0,
   closedUntil: r.reported_closed_until, openUntil: r.reported_open_until, closedTodayUntil: r.reported_closed_today_until,
   lastReportedAt: r.last_reported_at, lastReportedStatus: r.last_reported_status,
   primaryPhoto: r.primary_photo_id ? {
@@ -23,7 +23,7 @@ export const toCanteen = r => ({
   } : null,
 })
 export const toFood = r => ({
-  id: r.id, canteenId: r.canteen_id, name: r.name, price: r.price, photo: photoUrl(r.photo_path),
+  id: r.id, canteenId: r.canteen_id, name: r.name, price: r.price, photo: photoUrl(r.photo_path), photoPath: r.photo_path,
   superCount: r.super_count ?? 0, okayCount: r.okay_count ?? 0, avoidCount: r.avoid_count ?? 0,
 })
 
@@ -312,7 +312,7 @@ export async function fetchPublicProfile(userId, viewerId) {
   const row = check(pr)
   if (!row) return null
   return {
-    profile: { id: row.id, fullName: row.full_name, faculty: row.faculty, batch: row.batch, avatar: photoUrl(row.avatar_path) },
+    profile: { id: row.id, fullName: row.full_name, faculty: row.faculty, batch: row.batch, avatarPath: row.avatar_path, avatar: photoUrl(row.avatar_path) },
     stats: check(stats),
     posts,
   }
@@ -357,8 +357,7 @@ export async function deleteOwnPost(postId, userId) {
   need()
   const row = check(await supabase.from('posts').delete().eq('id', postId).eq('user_id', userId).select('photo_path').maybeSingle())
   if (!row) throw new Error('Post not found or not yours.')
-  const { error } = await supabase.storage.from('photos').remove([row.photo_path])
-  return { storageRemoved: !error }
+  return { storageRemoved: !row.photo_path || await removePostPhoto(row.photo_path) }
 }
 
 export async function fetchPeople(term = '', excludeId, limit = 12) {

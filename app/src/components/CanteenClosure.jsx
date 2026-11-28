@@ -1,7 +1,7 @@
 import { Clock } from 'lucide-react'
 import { canteenStatusLabel, isReportedClosed, lastReportLabel } from '../lib/food'
 
-export default function CanteenClosure({ canteen, now, busy, onAction }) {
+export default function CanteenClosure({ canteen, now, busy, onAction, onClearReports }) {
   const closed = isReportedClosed(canteen, now)
   const lastReport = lastReportLabel(canteen)
   const heading = closed || canteen.openUntil || lastReport ? canteenStatusLabel(canteen, now) : 'Is the canteen closed now?'
@@ -18,6 +18,7 @@ export default function CanteenClosure({ canteen, now, busy, onAction }) {
       <button type="button" className="mini" disabled={busy} onClick={() => onAction(closed ? 'open' : 'closed')}>
         {closed ? 'Report opened' : 'Report closed today'}
       </button>
+      {onClearReports && <button type="button" className="mini canteen-delete-action" disabled={busy} onClick={onClearReports}>Clear reports</button>}
     </div>
   )
 }
