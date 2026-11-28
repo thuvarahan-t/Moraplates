@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import People from '../components/People'
 import PeopleListDialog from '../components/PeopleListDialog'
+import ProfileAdminAccount from '../components/ProfileAdminAccount'
 import { exportPhoto } from '../lib/photoEdit'
 import { checkAdmin, moderateContent } from '../data/admin'
 import { samplePosts } from '../data/feed'
@@ -82,6 +83,7 @@ export function UserProfile() {
           <RemoveProfilePhoto key={id} profile={p} />
         </div>
       </>}
+      below={<ProfileAdminAccount key={id} userId={id} />}
       stats={data.stats}
       posts={data.posts}
       platesTitle={`${p.fullName.split(' ')[0]}'s plates`}

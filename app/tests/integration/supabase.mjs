@@ -32,7 +32,7 @@ try{
   for(let i=0;i<3;i++){
     const email='test-'+randomUUID()+'@uom.lk',password='Test!'+randomUUID()
     const {user}=check(await service.auth.admin.createUser({email,password,email_confirm:true,user_metadata:{full_name:'Test Foodie '+i}}))
-    users.push({id:user.id,client:client(anon)})
+    users.push({id:user.id,email,password,client:client(anon)})
     check(await users[i].client.auth.signInWithPassword({email,password}))
   }
   const [a, b, moderator] = users
@@ -388,7 +388,51 @@ try{
   assert.equal(check(await guest.from('canteens').select('id').eq('id', moderatedCanteen).maybeSingle()), null)
   moderatedCanteen = null
 
-  console.log('PASS: photo upload and replacement, owner post edits, shared food edits, public follow and like lists, private notification delivery and read state, seen privacy, closure and reopening, personal pins, admin CRUD, weekly vote totals and switching, owner deletion, scoped moderation and cross-owner storage cleanup')
+  const target = { target_user_id: moderator.id }
+  const ban = (client, banned, owner = target) => client.rpc('admin_set_account_ban', { ...owner, banned })
+  const account = client => client.rpc('admin_get_account', target)
+  const accessStatus = client => client.rpc('account_access_status')
+  assert.ok((await account(guest)).error, 'Guests cannot read private account emails')
+  assert.equal((await account(a.client)).error?.code, '42501')
+  assert.equal((await account(moderator.client)).error?.code, '42501', 'Content moderators cannot read private account emails')
+  assert.equal((await ban(moderator.client, true)).error?.code, '42501', 'Content moderators cannot ban accounts')
+  assert.equal((await ban(b.client, true, { target_user_id: b.id })).error?.code, '42501', 'Administrator accounts are protected')
+  const foundAccounts = check(await b.client.rpc('admin_list_accounts', { search_term: moderator.email, page_offset: 0 }))
+  assert.deepEqual(foundAccounts.map(row => [row.id, row.email, row.banned]), [[moderator.id, moderator.email, false]])
+  assert.deepEqual(check(await account(b.client)), foundAccounts[0])
+
+  const oldSession = check(await moderator.client.auth.getSession()).session
+  const stale = createClient(url, anon, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${oldSession.access_token}` } },
+  })
+  assert.equal(check(await accessStatus(stale)), 'active')
+  const bannedPhoto = moderator.id + '/' + randomUUID() + '.png'
+  moderationPaths.push(bannedPhoto)
+
+  check(await ban(b.client, true))
+  assert.equal(check(await account(b.client)).banned, true)
+  assert.equal(check(await accessStatus(stale)), 'banned')
+  assert.equal((await stale.from('notifications').select('id')).error?.code, 'PT403')
+  assert.equal((await stale.from('profiles').update({ full_name: 'Rejected write' }).eq('id', moderator.id)).error?.code, 'PT403')
+  assert.equal((await stale.rpc('withdraw_canteen_closed', { canteen: 'wala' })).error?.code, 'PT403')
+  assert.equal((await stale.rpc('is_content_moderator')).error?.code, 'PT403')
+  assert.ok((await stale.storage.from('photos').upload(bannedPhoto, png, { contentType: 'image/png' })).error, 'A banned token cannot upload')
+  assert.ok((await stale.auth.getUser(oldSession.access_token)).error, 'Auth user endpoint rejects a banned session')
+  const credentials = { email: moderator.email, password: moderator.password }
+  assert.equal((await client(anon).auth.signInWithPassword(credentials)).error?.code, 'user_banned')
+  assert.ok((await client(anon).auth.refreshSession({ refresh_token: oldSession.refresh_token })).error)
+  assert.equal(check(await guest.from('profiles').select('id').eq('id', moderator.id).single()).id, moderator.id)
+
+  check(await ban(b.client, false))
+  assert.equal(check(await account(b.client)).banned, false)
+  assert.equal(check(await accessStatus(stale)), 'signed_out', 'Unbanning never restores a revoked token')
+  assert.equal((await stale.from('notifications').select('id')).error?.code, 'PT401')
+  check(await moderator.client.auth.signInWithPassword(credentials))
+  assert.equal(check(await accessStatus(moderator.client)), 'active')
+  assert.equal(check(await moderator.client.rpc('is_content_moderator')), true)
+
+  console.log('PASS: media, social activity, live notifications, canteen status and votes, owner and moderator permissions, admin-only account details and bans, Auth/session revocation, and fresh login after unban')
 }finally{
   if(path)await service.storage.from('photos').remove([path])
   if(replacementPath)await service.storage.from('photos').remove([replacementPath])

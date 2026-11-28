@@ -38,14 +38,26 @@ async function readChatRequest(request) {
 
 async function readStudent(url, anonKey, authorization, fetchImpl) {
   if (!/^Bearer [\w.-]{1,4096}$/i.test(authorization ?? '')) return null
+  const headers = { apikey: anonKey, Authorization: authorization }
   const result = await fetchImpl(`${url}/auth/v1/user`, {
-    headers: { apikey: anonKey, Authorization: authorization },
+    headers,
     signal: AbortSignal.timeout(3500),
   })
   if ([400, 401, 403].includes(result.status)) return null
   if (!result.ok) throw new Error('Student session lookup failed')
   const user = await result.json()
-  return typeof user.id === 'string' && /^[^@\s]+@uom\.lk$/i.test(user.email ?? '') ? user.id : null
+  if (typeof user.id !== 'string' || !/^[^@\s]+@uom\.lk$/i.test(user.email ?? '')) return null
+
+  const access = await fetchImpl(`${url}/rest/v1/rpc/account_access_status`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: '{}',
+    signal: AbortSignal.timeout(3500),
+  })
+  if ([401, 403].includes(access.status)) return null
+  if (!access.ok) throw new Error('Student account access check failed')
+  const status = await access.json()
+  return status === 'active' ? user.id : null
 }
 
 function cleanHistory(history) {

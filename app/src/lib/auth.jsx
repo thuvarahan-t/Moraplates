@@ -3,9 +3,12 @@ import { ALLOWED_EMAIL_DOMAIN, createRecoveryClient, supabase } from './supabase
 import { SAMPLE_ME } from '../data/sample'
 import { photoUrl } from './photos'
 import { checkModeration } from '../data/admin'
+import { useFx } from './fx'
 
 const AuthContext = createContext(null)
 const noModeration = { allowed: false }
+const BANNED_MESSAGE = 'This account has been banned from MoraPlates.'
+const ACCESS_CHECK_INTERVAL = 15_000
 
 const toProfile = r => r && { id: r.id, fullName: r.full_name, faculty: r.faculty, batch: r.batch, avatarPath: r.avatar_path, avatar: photoUrl(r.avatar_path) }
 
@@ -24,6 +27,7 @@ export const RESET_CODE_LENGTH = 8
 /** Supabase auth errors in plain words. */
 function authMessage(e) {
   const m = e?.message ?? ''
+  if (e?.code === 'user_banned' || /user is banned|account (is|has been) banned/i.test(m)) return BANNED_MESSAGE
   if (/invalid login credentials/i.test(m)) return 'Wrong email or password.'
   if (/email not confirmed/i.test(m)) return 'This account is waiting for email confirmation. Ask the admin to confirm it in Supabase.'
   if (/already registered|already exists/i.test(m)) return 'That email already has an account. Sign in instead.'
@@ -35,22 +39,72 @@ function authMessage(e) {
 }
 
 export function AuthProvider({ children }) {
-  const [session, setSession] = useState(null)
+  const { toast } = useFx()
+  const [storedSession, setStoredSession] = useState(null)
+  const [checkedUserId, setCheckedUserId] = useState(null)
   const [loadedProfile, setProfile] = useState(supabase ? null : SAMPLE_ME)
-  const [ready, setReady] = useState(!supabase)
+  const [sessionReady, setSessionReady] = useState(!supabase)
   const [tick, setTick] = useState(0)
   const [moderation, setModeration] = useState(null)
   const recovery = useRef(null)
+  const currentAccessToken = useRef(null)
+  const storeSession = useCallback(next => {
+    currentAccessToken.current = next?.access_token ?? null
+    setStoredSession(next)
+    if (!next) setCheckedUserId(null)
+  }, [])
 
   useEffect(() => {
     if (!supabase) return
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session)
-      setReady(true)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, next) => {
+      storeSession(next)
+      setSessionReady(true)
     })
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => setSession(s))
     return () => subscription.unsubscribe()
-  }, [])
+  }, [storeSession])
+
+  const storedUserId = storedSession?.user?.id
+  const accessToken = storedSession?.access_token
+  const ready = sessionReady && (!storedUserId || checkedUserId === storedUserId)
+  const session = ready ? storedSession : null
+  useEffect(() => {
+    if (!storedUserId || !accessToken) return
+    let live = true
+    let checking = false
+
+    async function checkAccess() {
+      if (checking || document.visibilityState === 'hidden') return
+      checking = true
+      try {
+        const { data, error } = await supabase.rpc('account_access_status')
+        if (!live || currentAccessToken.current !== accessToken) return
+        const banned = data === 'banned' || error?.code === 'PT403'
+        if (banned || data === 'signed_out' || error?.code === 'PT401') {
+          storeSession(null)
+          toast(banned ? BANNED_MESSAGE : 'Your session ended. Sign in again.')
+          void supabase.auth.signOut({ scope: 'local' }).catch(() => {})
+        }
+      } catch {
+        // Keep the next foreground check available during temporary network errors.
+      } finally {
+        if (live && currentAccessToken.current === accessToken) setCheckedUserId(storedUserId)
+        checking = false
+      }
+    }
+
+    void checkAccess()
+    const timer = setInterval(checkAccess, ACCESS_CHECK_INTERVAL)
+    document.addEventListener('visibilitychange', checkAccess)
+    window.addEventListener('focus', checkAccess)
+    window.addEventListener('online', checkAccess)
+    return () => {
+      live = false
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', checkAccess)
+      window.removeEventListener('focus', checkAccess)
+      window.removeEventListener('online', checkAccess)
+    }
+  }, [storedUserId, accessToken, storeSession, toast])
 
   const userId = session?.user?.id
   const profile = supabase && loadedProfile?.id !== userId ? null : loadedProfile

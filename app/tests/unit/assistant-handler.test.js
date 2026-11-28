@@ -8,6 +8,8 @@ const env = {
   VITE_SUPABASE_ANON_KEY: 'publishable-test-key',
   GEMINI_API_KEY: 'gemini-test-key',
 }
+const userEndpoint = `${env.VITE_SUPABASE_URL}/auth/v1/user`
+const accessEndpoint = `${env.VITE_SUPABASE_URL}/rest/v1/rpc/account_access_status`
 
 async function ask(handler, { body, authorization, method = 'POST' } = {}) {
   const request = Readable.from([Buffer.from(JSON.stringify(body ?? { question: 'Which canteens are open?' }))])
@@ -35,13 +37,34 @@ test('assistant handles disabled configuration and rejects unverified requests b
   assert.equal((await ask(handler)).statusCode, 401)
   assert.deepEqual(upstreams, [])
   assert.equal((await ask(handler, { authorization: 'Bearer external.token' })).statusCode, 401)
-  assert.deepEqual(upstreams, [`${env.VITE_SUPABASE_URL}/auth/v1/user`])
+  assert.deepEqual(upstreams, [userEndpoint])
+})
+
+test('assistant requires an active account before answering even a greeting', async () => {
+  for (const [status, expectedCode] of [['banned', 401], ['signed_out', 401], [null, 401], ['unavailable', 503]]) {
+    const calls = []
+    const authorization = 'Bearer student.token'
+    const handler = createAssistantHandler(env, { fetchImpl: async (url, options) => {
+      calls.push(url)
+      if (url === userEndpoint) return Response.json({ id: 'student-id', email: 'account@uom.lk' })
+      assert.equal(url, accessEndpoint)
+      assert.equal(options.method, 'POST')
+      assert.equal(options.headers.apikey, env.VITE_SUPABASE_ANON_KEY)
+      assert.equal(options.headers.Authorization, authorization)
+      assert.deepEqual(JSON.parse(options.body), {})
+      return status === 'unavailable' ? new Response(null, { status: 503 }) : Response.json(status)
+    } })
+    const response = await ask(handler, { authorization, body: { question: 'hi' } })
+    assert.equal(response.statusCode, expectedCode)
+    assert.deepEqual(calls, [userEndpoint, accessEndpoint])
+  }
 })
 
 test('Helena greets in the selected language without calling the catalog or Gemini', async () => {
   const calls = []
   const handler = createAssistantHandler(env, { fetchImpl: async url => {
-    calls.push(String(url))
+    calls.push(url)
+    if (url === accessEndpoint) return Response.json('active')
     return Response.json({ id: 'student-id', email: 'account@uom.lk' })
   } })
   const greetings = [['hi', /Hi!/], ['Vanakkam!', /Vanakkam!/], ['வணக்கம்', /வணக்கம்/], ['ආයුබෝවන්', /හායි/]]
@@ -51,7 +74,7 @@ test('Helena greets in the selected language without calling the catalog or Gemi
     assert.equal(response.body.status, 'greeting')
     assert.match(response.body.answer, expected)
   }
-  assert.deepEqual(calls, Array(greetings.length).fill(`${env.VITE_SUPABASE_URL}/auth/v1/user`))
+  assert.deepEqual(calls, greetings.flatMap(() => [userEndpoint, accessEndpoint]))
 })
 
 test('assistant reads public catalog data and omits profile data and contact details from Gemini', async () => {
@@ -61,6 +84,10 @@ test('assistant reads public catalog data and omits profile data and contact det
     if (url.pathname === '/auth/v1/user') {
       assert.equal(options.headers.Authorization, 'Bearer student.token')
       return Response.json({ id: 'student-id', email: 'account@uom.lk', user_metadata: { full_name: 'Private Profile Name' } })
+    }
+    if (url.pathname === '/rest/v1/rpc/account_access_status') {
+      assert.equal(options.headers.Authorization, 'Bearer student.token')
+      return Response.json('active')
     }
     if (url.pathname === '/rest/v1/canteen_standings') {
       assert.equal(options.headers.Authorization, undefined)
