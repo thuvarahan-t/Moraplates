@@ -1,0 +1,48 @@
+.notification-bell { position: relative }
+.notification-badge {
+  position: absolute;
+  inset: 0 0 auto auto;
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  min-height: 18px;
+  padding: 0 3px;
+  border: 2px solid var(--bg);
+  border-radius: 999px;
+  background: var(--brand);
+  color: var(--btnk);
+  font-size: .625rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.notification-header-actions { display: flex; align-items: center; gap: 8px }
+.notification-mark-all { min-height: 40px; padding-inline: 5px; color: var(--brand) }
+.notification-list { margin: 0; padding: 8px; list-style: none }
+.notification-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 12px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.notification-row:hover { background: var(--chip) }
+.notification-avatar { display: inline-flex; flex: none }
+.notification-avatar .av { width: 40px; height: 40px; font-size: 14px }
+.notification-copy { display: grid; flex: 1; gap: 2px; line-height: 1.4; overflow-wrap: anywhere }
+.notification-copy time { font-size: .75rem; color: var(--mut) }
+.notification-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--brand) }
+.notification-more { display: flex; justify-content: center; padding: 0 12px 12px }
+
+@media (min-width: 761px) and (max-width: 900px) {
+  .hw:has(> .notification-bell) { gap: 10px }
+  .hw:has(> .notification-bell) .tabs a { padding-inline: 11px }
+}
+
+@media (max-width: 760px) {
+  .hw > .notification-bell { margin-inline-start: auto }
+  .hw > .notification-bell + .me { flex: none; margin-inline-start: -8px }
+}
