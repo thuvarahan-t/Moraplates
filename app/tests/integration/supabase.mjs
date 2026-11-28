@@ -13,7 +13,7 @@ async function withDeadline(promise, label) {
   let timer
   try {
     return await Promise.race([promise, new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error(label)), 10_000)
+      timer = setTimeout(() => reject(new Error(label)), 15_000)
     })])
   } finally {
     clearTimeout(timer)
@@ -52,16 +52,23 @@ try{
 
   const session = check(await a.client.auth.getSession()).session
   await a.client.realtime.setAuth(session.access_token)
-  const notificationChannel = a.client.channel(`notifications:${a.id}`, { config: { private: true } })
+  const notificationChannel = a.client.channel(`notifications:${a.id}`, {
+    config: { private: true, broadcast: { replication_ready: true } },
+  })
   const signal = new Promise(resolve => notificationChannel.on('broadcast', { event: 'changed' }, resolve))
+  const replicationReady = new Promise(resolve => notificationChannel.on('system', '*', ({ extension, status }) => {
+    if (extension === 'system' && status === 'ok') resolve()
+  }))
+  const joined = new Promise((resolve, reject) => notificationChannel.subscribe(status => {
+    if (status === 'SUBSCRIBED') resolve()
+    else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') reject(new Error(`Private notification channel: ${status}`))
+  }))
   try {
-    await withDeadline(new Promise((resolve, reject) => notificationChannel.subscribe(status => {
-      if (status === 'SUBSCRIBED') resolve()
-      else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') reject(new Error(`Private notification channel: ${status}`))
-    })), 'Private notification channel did not subscribe')
+    // The socket join can finish before the server starts streaming database broadcasts.
+    await withDeadline(Promise.all([joined, replicationReady]), 'Notification replication was not ready')
     check(await b.client.from('likes').insert({ post_id: post }))
-    const event = await withDeadline(signal, 'The like did not signal the recipient')
-    assert.deepEqual(event.payload, {})
+    const { payload } = await withDeadline(signal, 'The like did not signal the recipient')
+    assert.ok(payload && Object.keys(payload).every(key => key === 'id'), 'Signal must only carry transport metadata')
   } finally {
     await a.client.removeChannel(notificationChannel)
   }
@@ -381,7 +388,7 @@ try{
   assert.equal(check(await guest.from('canteens').select('id').eq('id', moderatedCanteen).maybeSingle()), null)
   moderatedCanteen = null
 
-  console.log('PASS: photo upload and replacement, owner post edits, shared food edits, public follow and like lists, private notifications and live signals, seen privacy, closure and reopening, personal pins, admin CRUD, weekly vote totals and switching, owner deletion, scoped moderation and cross-owner storage cleanup')
+  console.log('PASS: photo upload and replacement, owner post edits, shared food edits, public follow and like lists, private notification delivery and read state, seen privacy, closure and reopening, personal pins, admin CRUD, weekly vote totals and switching, owner deletion, scoped moderation and cross-owner storage cleanup')
 }finally{
   if(path)await service.storage.from('photos').remove([path])
   if(replacementPath)await service.storage.from('photos').remove([replacementPath])

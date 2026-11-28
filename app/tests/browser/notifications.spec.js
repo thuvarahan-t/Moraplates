@@ -117,3 +117,13 @@ test('a private update refreshes the unread badge while the list is closed', asy
   await expect(page.getByRole('button', { name: 'Notifications, 3 unread' })).toBeVisible()
   await expect(page.getByRole('dialog', { name: 'Notifications' })).toHaveCount(0)
 })
+
+test('the visible app refreshes notifications when Realtime is unavailable', async ({ page }) => {
+  await page.clock.install()
+  await page.routeWebSocket(`${supabaseUrl.replace(/^https:/, 'wss:')}/realtime/v1/websocket**`, socket => socket.close())
+  const { rows } = await openFeed(page, userId)
+  await expect(page.getByRole('button', { name: 'Notifications, 2 unread' })).toBeVisible()
+  rows.unshift({ ...rows[0], id: 3 })
+  await page.clock.fastForward(15_000)
+  await expect(page.getByRole('button', { name: 'Notifications, 3 unread' })).toBeVisible()
+})

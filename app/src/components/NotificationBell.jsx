@@ -95,7 +95,7 @@ export default function NotificationBell() {
   return (
     <>
       <button className="social-icon notification-bell" type="button" aria-label={label} title="Notifications"
-        aria-haspopup="dialog" onClick={() => setOpen(true)}>
+        aria-haspopup="dialog" onClick={() => { data.reload(); setOpen(true) }}>
         <Bell size={21} aria-hidden="true" />
         {unread > 0 && <span className="notification-badge" aria-hidden="true">{unread > 99 ? '99+' : unread}</span>}
       </button>

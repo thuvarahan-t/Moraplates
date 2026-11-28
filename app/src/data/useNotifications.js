@@ -5,7 +5,7 @@ import { fetchNotifications, fetchUnreadNotifications, markNotificationsRead } f
 import { queryKey } from './queryCache'
 import { useQuery } from './useQuery'
 
-const POLL_INTERVAL = 60_000
+const POLL_INTERVAL = 15_000
 const NO_ROWS = []
 
 export function useNotifications({ open }) {
@@ -43,8 +43,11 @@ export function useNotifications({ open }) {
       try {
         await supabase.realtime.setAuth(accessToken)
         if (!subscribed) return
-        channel = supabase.channel(`notifications:${userId}`, { config: { private: true } })
+        channel = supabase.channel(`notifications:${userId}`, { config: { private: true, broadcast: { replication_ready: true } } })
           .on('broadcast', { event: 'changed' }, () => { if (subscribed) refresh() })
+          .on('system', '*', ({ extension, status }) => {
+            if (subscribed && extension === 'system' && status === 'ok') refresh()
+          })
           .subscribe(status => { if (subscribed && status === 'SUBSCRIBED') refresh() })
       } catch {
         // Foreground refresh and polling still work without Realtime.
