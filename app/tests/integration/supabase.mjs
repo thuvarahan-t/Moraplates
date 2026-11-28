@@ -9,11 +9,11 @@ assert.ok(['127.0.0.1','localhost'].includes(new URL(url).hostname),'Refusing no
 const client=key=>createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}})
 const service=client(serviceKey)
 const check=({data,error})=>{if(error)throw error;return data}
-async function withDeadline(promise, label) {
+async function withDeadline(promise, label, timeout = 15_000) {
   let timer
   try {
     return await Promise.race([promise, new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error(label)), 15_000)
+      timer = setTimeout(() => reject(new Error(label)), timeout)
     })])
   } finally {
     clearTimeout(timer)
@@ -77,17 +77,28 @@ try{
   const signalListeners = []
   const nextSignal = () => new Promise(resolve => signalListeners.push(resolve))
   notificationChannel.on('broadcast', { event: 'changed' }, signal => signalListeners.shift()?.(signal))
-  const replicationReady = new Promise(resolve => notificationChannel.on('system', '*', ({ extension, status }) => {
-    if (extension === 'system' && status === 'ok') resolve()
-  }))
-  const joined = new Promise((resolve, reject) => notificationChannel.subscribe(status => {
-    if (status === 'SUBSCRIBED') resolve()
-    else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') reject(new Error(`Private notification channel: ${status}`))
-  }))
+  let subscriptionStatus = 'CONNECTING'
+  const notificationReady = new Promise(resolve => {
+    let replicationReady = false
+    function resolveWhenReady() {
+      if (subscriptionStatus === 'SUBSCRIBED' && replicationReady) resolve()
+    }
+    notificationChannel.on('system', '*', ({ extension, status }) => {
+      if (extension !== 'system' || status !== 'ok') return
+      replicationReady = true
+      resolveWhenReady()
+    })
+    notificationChannel.subscribe(status => {
+      subscriptionStatus = status
+      if (status !== 'SUBSCRIBED') replicationReady = false
+      resolveWhenReady()
+    })
+  })
   let firstReply
   try {
-    // The socket join can finish before the server starts streaming database broadcasts.
-    await withDeadline(Promise.all([joined, replicationReady]), 'Notification replication was not ready')
+    // Let the client reconnect after a local database reset and wait for database broadcasts.
+    await withDeadline(notificationReady, 'Notification replication was not ready', 40_000)
+      .catch(error => { throw new Error(`${error.message} (channel status: ${subscriptionStatus})`) })
     const likeSignal = nextSignal()
     check(await b.client.from('likes').insert({ post_id: post }))
     const { payload } = await withDeadline(likeSignal, 'The like did not signal the recipient')
