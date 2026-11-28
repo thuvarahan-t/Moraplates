@@ -167,7 +167,13 @@ function OwnProfile({ uid, email, profile, details }) {
       posts={data?.posts}
       platesTitle="Your plates"
       emptyPlates="No plates yet. Tap + to post your first one."
-      after={<div className="cacts">{showAdmin === true && <Link className="btn sm" to="/admin">Admin console</Link>}<InstallButton/><button className="btn ghost sm signout" onClick={leave}><LogOutIcon />Sign out</button></div>}
+      after={
+        <div className="cacts profile-account-actions">
+          {showAdmin === true && <Link className="btn sm" to="/admin">Admin console</Link>}
+          <InstallButton />
+          <button className="btn ghost sm" type="button" onClick={leave}><LogOutIcon />Sign out</button>
+        </div>
+      }
     />
   )
 }

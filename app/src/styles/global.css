@@ -302,7 +302,6 @@ body{padding-bottom:86px}#toast{bottom:100px}
 .fl em{font-style:normal;font-weight:400;color:var(--mut);font-size:13px;margin-left:6px}
 /* Profile */
 .mine .sq{display:block;width:100%;aspect-ratio:1;object-fit:cover}
-.signout{margin-top:32px}
 .badges{margin-bottom:4px}
 .wl-form>.fl{flex:none}
 /* Floating bottom bar (phones) */
@@ -396,6 +395,8 @@ dialog#dlg[open]{animation:sheet .45s var(--spring)}
 .cbanner .open.y{color:#8FE0AE}.cbanner .open.n{color:#FFB3A3}
 .cbanner .btn.voted{background:#E3F3E8}
 .cacts{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px}
+.profile-account-actions{align-items:center;margin-top:16px}
+.profile-account-actions>.pwa-inline{order:1}
 /* Home banner carousel */
 .bnr{position:relative;margin-bottom:22px;border-radius:22px;overflow:hidden;box-shadow:var(--sh)}
 .bnr-track{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;overscroll-behavior-x:contain}
