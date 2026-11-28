@@ -9,11 +9,11 @@ assert.ok(['127.0.0.1','localhost'].includes(new URL(url).hostname),'Refusing no
 const client=key=>createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}})
 const service=client(serviceKey)
 const check=({data,error})=>{if(error)throw error;return data}
-async function withDeadline(promise, label) {
+async function withDeadline(promise, label, timeout = 15_000) {
   let timer
   try {
     return await Promise.race([promise, new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error(label)), 15_000)
+      timer = setTimeout(() => reject(new Error(label)), timeout)
     })])
   } finally {
     clearTimeout(timer)
@@ -42,6 +42,21 @@ try{
   check(await a.client.storage.from('photos').upload(path,png,{contentType:'image/png'}))
   post=check(await a.client.from('posts').insert({canteen_id:'wala',food_id:food,rating:'super',photo_path:path,caption:'Integration test'}).select('id').single()).id
   const guest = client(anon)
+  const pushSubscription = {
+    push_endpoint: 'https://web.push.apple.com/' + randomUUID(),
+    push_p256dh: 'B' + 'A'.repeat(86),
+    push_auth: 'A'.repeat(22),
+  }
+  const pushEndpoint = { push_endpoint: pushSubscription.push_endpoint }
+  assert.ok((await guest.rpc('web_push_register', pushSubscription)).error, 'Guests cannot register a push device')
+  assert.ok((await b.client.rpc('web_push_register', { ...pushSubscription, push_endpoint: 'https://example.com/push' })).error)
+  check(await a.client.rpc('web_push_register', pushSubscription))
+  assert.equal(check(await a.client.rpc('web_push_subscription_active', pushEndpoint)), true)
+  assert.equal(check(await b.client.rpc('web_push_subscription_active', pushEndpoint)), false)
+  assert.ok((await b.client.rpc('web_push_register', { ...pushSubscription, push_auth: 'B'.repeat(22) })).error)
+  check(await b.client.rpc('web_push_unregister', pushEndpoint))
+  assert.equal(check(await a.client.rpc('web_push_subscription_active', pushEndpoint)), true)
+  assert.ok((await a.client.rpc('claim_web_push_deliveries')).error, 'Only the dispatcher can claim queued push jobs')
   const foodChanges = { target_food: food, new_name: '  Renamed ' + randomUUID().slice(0, 8) + '  ', new_price: 275 }
   assert.ok((await guest.rpc('update_food', foodChanges)).error, 'Guests cannot edit the menu')
   assert.equal((await b.client.rpc('update_food', { ...foodChanges, new_price: 0 })).error?.code, '22023')
@@ -50,25 +65,47 @@ try{
     name: foodChanges.new_name.trim(), price: 275, canteen_id: 'wala', created_by: a.id,
   })
 
+  const addComment = async (author, body, parent_id = null) => check(await author.from('comments')
+    .insert({ post_id: post, body, parent_id }).select('id').single()).id
+  const replyParent = await addComment(a.client, 'Reply parent')
+
   const session = check(await a.client.auth.getSession()).session
   await a.client.realtime.setAuth(session.access_token)
   const notificationChannel = a.client.channel(`notifications:${a.id}`, {
     config: { private: true, broadcast: { replication_ready: true } },
   })
-  const signal = new Promise(resolve => notificationChannel.on('broadcast', { event: 'changed' }, resolve))
-  const replicationReady = new Promise(resolve => notificationChannel.on('system', '*', ({ extension, status }) => {
-    if (extension === 'system' && status === 'ok') resolve()
-  }))
-  const joined = new Promise((resolve, reject) => notificationChannel.subscribe(status => {
-    if (status === 'SUBSCRIBED') resolve()
-    else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') reject(new Error(`Private notification channel: ${status}`))
-  }))
+  const signalListeners = []
+  const nextSignal = () => new Promise(resolve => signalListeners.push(resolve))
+  notificationChannel.on('broadcast', { event: 'changed' }, signal => signalListeners.shift()?.(signal))
+  let subscriptionStatus = 'CONNECTING'
+  const notificationReady = new Promise(resolve => {
+    let replicationReady = false
+    function resolveWhenReady() {
+      if (subscriptionStatus === 'SUBSCRIBED' && replicationReady) resolve()
+    }
+    notificationChannel.on('system', '*', ({ extension, status }) => {
+      if (extension !== 'system' || status !== 'ok') return
+      replicationReady = true
+      resolveWhenReady()
+    })
+    notificationChannel.subscribe(status => {
+      subscriptionStatus = status
+      if (status !== 'SUBSCRIBED') replicationReady = false
+      resolveWhenReady()
+    })
+  })
+  let firstReply
   try {
-    // The socket join can finish before the server starts streaming database broadcasts.
-    await withDeadline(Promise.all([joined, replicationReady]), 'Notification replication was not ready')
+    // Let the client reconnect after a local database reset and wait for database broadcasts.
+    await withDeadline(notificationReady, 'Notification replication was not ready', 40_000)
+      .catch(error => { throw new Error(`${error.message} (channel status: ${subscriptionStatus})`) })
+    const likeSignal = nextSignal()
     check(await b.client.from('likes').insert({ post_id: post }))
-    const { payload } = await withDeadline(signal, 'The like did not signal the recipient')
+    const { payload } = await withDeadline(likeSignal, 'The like did not signal the recipient')
     assert.ok(payload && Object.keys(payload).every(key => key === 'id'), 'Signal must only carry transport metadata')
+    const replySignal = nextSignal()
+    firstReply = await addComment(b.client, 'First reply', replyParent)
+    await withDeadline(replySignal, 'The reply did not signal the recipient')
   } finally {
     await a.client.removeChannel(notificationChannel)
   }
@@ -99,15 +136,35 @@ try{
   assert.deepEqual(check(await followers(null)).map(person => person.id), [moderator.id])
 
   const inbox = async client => check(await client.from('notifications')
-    .select('id, kind, recipient_id, actor_id, post_id, read_at, actor:profiles!notifications_actor_id_fkey(id, full_name)')
+    .select('id, kind, recipient_id, actor_id, post_id, comment_id, parent_comment_id, read_at, actor:profiles!notifications_actor_id_fkey(id, full_name)')
     .order('id', { ascending: false }))
   assert.ok((await guest.from('notifications').select('id')).error, 'Guest inbox access is denied')
   assert.deepEqual(await inbox(moderator.client), [], 'Only recipients can read notifications')
   const incoming = await inbox(a.client)
-  assert.deepEqual(incoming.map(row => [row.kind, row.actor_id, row.post_id]), [
-    ['follow', b.id, null], ['like', moderator.id, post], ['like', b.id, post],
+  assert.deepEqual(incoming.map(row => [row.kind, row.actor_id, row.post_id, row.comment_id, row.parent_comment_id]), [
+    ['follow', b.id, null, null, null], ['like', moderator.id, post, null, null],
+    ['reply', b.id, post, firstReply, replyParent], ['like', b.id, post, null, null],
   ])
   assert.ok(incoming.every(row => row.recipient_id === a.id && row.read_at === null && row.actor.id === row.actor_id))
+  const deliveries = check(await service.rpc('claim_web_push_deliveries'))
+  assert.deepEqual(deliveries.map(row => [row.notification_id, row.kind, row.comment_id]).sort(),
+    incoming.map(row => [String(row.id), row.kind, row.comment_id]).sort(), 'Like, reply and follow are queued for the opted-in recipient')
+  assert.ok(deliveries.every(row => row.endpoint === pushSubscription.push_endpoint))
+  assert.deepEqual(check(await service.rpc('claim_web_push_deliveries')), [], 'A lease prevents concurrent delivery')
+  for (const job of deliveries) {
+    check(await service.rpc('finish_web_push_delivery', { push_job_id: job.job_id, push_attempt: job.attempt, expired: false }))
+  }
+  check(await a.client.rpc('web_push_unregister', pushEndpoint))
+  assert.equal(check(await a.client.rpc('web_push_subscription_active', pushEndpoint)), false)
+
+  const otherSession = client(anon)
+  check(await otherSession.auth.signInWithPassword({ email: a.email, password: a.password }))
+  check(await otherSession.rpc('web_push_register', pushSubscription))
+  assert.equal(check(await a.client.rpc('web_push_subscription_active', pushEndpoint)), false)
+  check(await otherSession.auth.signOut({ scope: 'local' }))
+  const afterSignOut = await addComment(b.client, 'After push sign-out', replyParent)
+  assert.deepEqual(check(await service.rpc('claim_web_push_deliveries')), [], 'Signing out revokes device delivery')
+  check(await b.client.from('comments').delete().eq('id', afterSignOut))
   assert.deepEqual((await inbox(b.client)).map(row => row.actor_id), [moderator.id, a.id], 'Follow events survive unfollow')
   assert.ok((await b.client.from('notifications').insert({ recipient_id: a.id, actor_id: b.id, kind: 'follow' })).error)
   assert.ok((await a.client.from('notifications').update({ kind: 'follow' }).eq('id', incoming[1].id)).error)
@@ -116,16 +173,32 @@ try{
   const markRead = (filter, id) => a.client.from('notifications').update({ read_at: readAt })
     .eq('recipient_id', a.id).is('read_at', null).filter('id', filter, id).select('id')
   assert.deepEqual(check(await markRead('eq', incoming[0].id)), [{ id: incoming[0].id }])
-  assert.equal(check(await markRead('lte', incoming[0].id)).length, 2)
+  assert.equal(check(await markRead('lte', incoming[0].id)).length, 3)
   assert.ok((await inbox(a.client)).every(row => !!row.read_at))
 
   check(await follow(a.client, b.id))
   check(await moderator.client.from('likes').insert({ post_id: post }))
   check(await a.client.from('likes').insert({ post_id: post }))
-  assert.equal((await inbox(a.client)).length, 3, 'Repeated and self likes do not create extra notifications')
+  assert.equal((await inbox(a.client)).length, 4, 'Repeated and self likes do not create extra notifications')
   assert.equal((await inbox(b.client)).length, 2, 'A repeated follow does not create an extra notification')
   check(await a.client.from('likes').delete().eq('post_id', post).eq('user_id', a.id))
   check(await moderator.client.from('likes').delete().eq('post_id', post).eq('user_id', moderator.id))
+
+  const replyInbox = async author => (await inbox(author)).filter(row => row.kind === 'reply')
+  const secondReply = await addComment(b.client, 'Separate reply from same author', replyParent)
+  const nestedReply = await addComment(moderator.client, 'Nested reply', firstReply)
+  await addComment(a.client, 'Self reply', replyParent)
+  assert.deepEqual((await replyInbox(a.client)).map(row => row.comment_id), [secondReply, firstReply])
+  assert.deepEqual((await replyInbox(b.client)).map(row => [row.comment_id, row.parent_comment_id, row.actor_id]), [
+    [nestedReply, firstReply, moderator.id],
+  ])
+  assert.deepEqual(await replyInbox(moderator.client), [], 'Only the immediate parent comment author sees a reply')
+  check(await b.client.from('comments').delete().eq('id', firstReply))
+  assert.deepEqual((await replyInbox(a.client)).map(row => row.comment_id), [secondReply])
+  assert.deepEqual(await replyInbox(b.client), [], 'Deleting a parent removes notifications for its replies')
+  check(await a.client.from('comments').delete().eq('id', replyParent))
+  assert.deepEqual(await replyInbox(a.client), [])
+  assert.deepEqual(check(await guest.from('comments').select('parent_id').eq('id', secondReply).single()), { parent_id: null })
 
   const postDetails = async () => check(await guest.from('posts')
     .select('created_at, user_id, caption, rating, photo_path, food_id, likes(count)').eq('id', post).single())
@@ -418,8 +491,9 @@ try{
   const plate = { canteen_id: moderatedCanteen, food_id: food, rating: 'super', caption: 'Visibility test' }
   post = check(await a.client.from('posts').insert({ ...plate, photo_path: path }).select('id').single()).id
   const hiddenPost = check(await moderator.client.from('posts').insert({ ...plate, photo_path: hiddenPhoto }).select('id').single()).id
-  check(await a.client.from('comments').insert({ post_id: post, body: 'Visible comment' }))
-  const hiddenComment = check(await moderator.client.from('comments').insert({ post_id: post, body: 'Hidden comment' }).select('id').single()).id
+  const visibleComment = await addComment(a.client, 'Visible comment')
+  const hiddenComment = await addComment(moderator.client, 'Hidden reply', visibleComment)
+  assert.ok((await replyInbox(a.client)).some(row => row.comment_id === hiddenComment))
   const commentOnHiddenPost = check(await a.client.from('comments').insert({ post_id: hiddenPost, body: 'Hidden thread' }).select('id').single()).id
   check(await moderator.client.from('likes').insert({ post_id: post }))
   check(await b.client.from('likes').insert({ post_id: post }))
@@ -520,6 +594,7 @@ try{
   assert.equal(await photoVisibility(hiddenPhoto), true)
   check(await guest.storage.from('photos').download(hiddenPhoto))
   check(await moderator.client.auth.signInWithPassword(credentials))
+  assert.ok((await replyInbox(a.client)).some(row => row.comment_id === hiddenComment), 'Restored replies reappear in the inbox')
   assert.equal(check(await accessStatus(moderator.client)), 'active')
   assert.equal(check(await moderator.client.rpc('is_content_moderator')), true)
 

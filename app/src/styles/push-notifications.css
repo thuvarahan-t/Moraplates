@@ -1,0 +1,15 @@
+.notification-push {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  color: var(--brand);
+}
+
+.notification-push > svg { flex-shrink: 0; }
+.notification-push-copy { flex: 1; min-width: 0; font-size: 14px; }
+.notification-push-copy strong { display: block; }
+.notification-push-copy p { margin: 2px 0 0; color: var(--mut); font-size: 12px; }
+.notification-push-action { flex-shrink: 0; min-height: 44px; }

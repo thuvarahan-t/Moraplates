@@ -70,7 +70,7 @@ function PostMedia({ photo, foodName, canteen, eager, reaction, onDoubleTap }) {
   </div>
 }
 
-export default function PostCard({ post, canteen, index = 0, showFollow = false, onLike, onSeen, onDeleted }) {
+export default function PostCard({ post, canteen, index = 0, showFollow = false, onLike, onSeen, onDeleted, commentId, onCloseLinkedComment }) {
   const [label, cls] = RATING[post.rating] ?? ['Plate','']
   const [pops,setPops] = useState(0)
   const [reaction,setReaction] = useState(0)
@@ -209,7 +209,8 @@ export default function PostCard({ post, canteen, index = 0, showFollow = false,
       <div className="post-food"><b>{post.food.name}</b><span>Rs {post.food.price}</span></div>
       {post.caption && <p className="post-caption"><b>{post.author.name}</b> {post.caption}</p>}
     </div>
-    {open && <Comments key={post.id} postId={post.id} onClose={() => setOpen(false)}
+    {(open || commentId) && <Comments key={commentId || post.id} postId={post.id} commentId={commentId}
+      onClose={() => { setOpen(false); if (commentId) onCloseLinkedComment() }}
       onCount={change => setCommentCount(count => Math.max(0, count + change))} />}
     {likesOpen && <PeopleListDialog key={post.id} title="Likes" emptyMessage="No likes yet."
       loadPage={loadLikers} onClose={() => setLikesOpen(false)} />}

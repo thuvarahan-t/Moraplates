@@ -1,26 +1,27 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Bell } from 'lucide-react'
+import { notificationCopy, notificationDestination } from '../data/notifications'
 import { useNotifications } from '../data/useNotifications'
 import { timeAgo } from '../lib/format'
 import Avatar from './Avatar'
 import { CloseIcon } from './icons'
 import { Link } from './NavLinks'
+import NotificationPreview from './NotificationPreview'
+import PushNotificationControl from './PushNotificationControl'
 import '../styles/comments.css'
 import '../styles/notifications.css'
 
 function NotificationRow({ item, onOpen }) {
-  const { actor, createdAt, postId, readAt, type } = item
+  const { actor, createdAt, readAt, type } = item
   const created = new Date(createdAt)
-  const liked = type === 'like'
-  const destination = liked ? `/posts/${postId}` : `/u/${actor.id}`
 
   return (
     <li>
-      <Link className="notification-row" to={destination} onClick={event => onOpen(event, item)}>
+      <Link className="notification-row" to={notificationDestination(item)} viewTransition={false} onClick={event => onOpen(event, item)}>
         <span className="notification-avatar" aria-hidden="true"><Avatar name={actor.name} url={actor.avatar} /></span>
         <span className="notification-copy">
-          <span><strong>{actor.name}</strong> {liked ? 'liked your post.' : 'followed you.'}</span>
+          <span><strong>{actor.name}</strong> {notificationCopy(type)}</span>
           <time dateTime={created.toISOString()}>{timeAgo(created.getTime())}</time>
         </span>
         {!readAt && <span className="notification-dot"><span className="sr">Unread</span></span>}
@@ -31,13 +32,16 @@ function NotificationRow({ item, onOpen }) {
 
 function NotificationsDialog({ data, onClose }) {
   const dialog = useRef(null)
+  const heading = useRef(null)
   const backdropPress = useRef(false)
   const titleId = useId()
   const { unreadCount, notifications, loading, error, reload, markRead, markAllRead, hasMore, loadMore, loadingMore, marking, writeError } = data
   const close = () => dialog.current?.close()
 
   useEffect(() => {
-    if (!dialog.current.open) dialog.current.showModal()
+    if (dialog.current.open) return
+    dialog.current.showModal()
+    heading.current.focus({ preventScroll: true })
   }, [])
 
   function openNotification(event, item) {
@@ -51,13 +55,14 @@ function NotificationsDialog({ data, onClose }) {
       onPointerDown={event => { backdropPress.current = event.target === event.currentTarget }}
       onClick={event => { if (backdropPress.current && event.target === event.currentTarget) close() }}>
       <header className="cm-header">
-        <h2 id={titleId}>Notifications</h2>
+        <h2 id={titleId} ref={heading} tabIndex={-1}>Notifications</h2>
         <div className="notification-header-actions">
           {unreadCount > 0 && <button className="cm-text-button notification-mark-all" type="button" disabled={marking}
             onClick={markAllRead}>Mark all as read</button>}
           <button className="cm-close" type="button" aria-label="Close notifications" onClick={close}><CloseIcon size={20} /></button>
         </div>
       </header>
+      <PushNotificationControl />
       <div className="cm-thread">
         {writeError && <p className="cm-write-error" role="alert">Couldn't update read status. Try again.</p>}
         {notifications.length > 0 && (
@@ -99,6 +104,7 @@ export default function NotificationBell() {
         <Bell size={21} aria-hidden="true" />
         {unread > 0 && <span className="notification-badge" aria-hidden="true">{unread > 99 ? '99+' : unread}</span>}
       </button>
+      <NotificationPreview latest={data.latestUnread} open={open} markRead={data.markRead} />
       {open && <NotificationsDialog data={data} onClose={() => setOpen(false)} />}
     </>
   )

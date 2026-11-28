@@ -34,15 +34,19 @@ function groupComments(list) {
   return [...threads.values()]
 }
 
-export default function Comments({ postId, onClose, onCount }) {
+export default function Comments({ postId, commentId, onClose, onCount }) {
   const dialog = useRef(null)
+  const heading = useRef(null)
   const backdropPress = useRef(false)
   const title = useId()
   const close = () => dialog.current?.close()
 
   useEffect(() => {
     const sheet = dialog.current
-    if (!sheet.open) sheet.showModal()
+    if (!sheet.open) {
+      sheet.showModal()
+      heading.current.focus({ preventScroll: true })
+    }
 
     const viewport = window.visualViewport
     if (!viewport) return
@@ -64,10 +68,10 @@ export default function Comments({ postId, onClose, onCount }) {
       onPointerDown={event => { backdropPress.current = event.target === event.currentTarget }}
       onClick={event => { if (backdropPress.current && event.target === event.currentTarget) close() }}>
       <header className="cm-header">
-        <h2 id={title}>Comments</h2>
+        <h2 id={title} ref={heading} tabIndex={-1}>Comments</h2>
         <button className="cm-close" type="button" aria-label="Close comments" onClick={close}><CloseIcon size={20} /></button>
       </header>
-      {supabase ? <CommentThread postId={postId} onCount={onCount} close={close} />
+      {supabase ? <CommentThread postId={postId} commentId={commentId} onCount={onCount} close={close} />
         : <p className="cm-status">Comments are available when a live project is connected.</p>}
     </dialog>
   )
@@ -96,7 +100,7 @@ function CommentRow({ comment, parent, onReply, onDelete, close, busy, activeRef
   )
 }
 
-function CommentThread({ postId, onCount, close }) {
+function CommentThread({ postId, commentId, onCount, close }) {
   const { ready, session, profile } = useAuth()
   const { allowed } = useModeration()
   const { cache } = usePost()
@@ -114,7 +118,10 @@ function CommentThread({ postId, onCount, close }) {
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const groups = useMemo(() => groupComments(thread?.list ?? []), [thread])
-  const activeCommentId = replyTo?.comment.id ?? postedId
+  const linkedThread = commentId && groups.find(({ root, replies }) =>
+    root.id === commentId || replies.some(({ comment }) => comment.id === commentId))
+  const linkedRootId = linkedThread?.root.id
+  const activeCommentId = replyTo?.comment.id ?? postedId ?? commentId
 
   useEffect(() => {
     let current = true
@@ -130,7 +137,7 @@ function CommentThread({ postId, onCount, close }) {
 
   useEffect(() => {
     activeRow.current?.scrollIntoView({ block: 'nearest' })
-  }, [replyTo, postedId])
+  }, [activeCommentId, linkedRootId])
 
   const canWrite = reason => {
     if (gate(reason)) return true
@@ -218,14 +225,14 @@ function CommentThread({ postId, onCount, close }) {
             : <ol className="cm-list" role="list">
               {groups.map(({ root, replies }) => {
                 const listId = `${replyListId}-${root.id}`
-                const isExpanded = !!expanded[root.id]
+                const isExpanded = expanded[root.id] ?? (root.id === linkedRootId)
                 return (
                   <li key={root.id}>
                     {renderComment(root, root.id)}
                     {replies.length > 0 && (
                       <div className="cm-replies">
                         <button className="cm-text-button cm-expand" type="button" aria-expanded={isExpanded} aria-controls={listId}
-                          onClick={() => setExpanded(previous => ({ ...previous, [root.id]: !previous[root.id] }))}>
+                          onClick={() => setExpanded(previous => ({ ...previous, [root.id]: !isExpanded }))}>
                           {isExpanded ? 'Hide replies' : `View ${replies.length} ${replies.length === 1 ? 'reply' : 'replies'}`}
                         </button>
                         <ol className="cm-list cm-reply-list" id={listId} role="list" hidden={!isExpanded}>

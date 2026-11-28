@@ -11,6 +11,7 @@ const PAGE_SIZE = 24
 /** Show one public list of profiles, reading more only when requested. */
 export default function PeopleListDialog({ title, emptyMessage, loadPage, onClose }) {
   const dialog = useRef(null)
+  const heading = useRef(null)
   const backdropPress = useRef(false)
   const headingId = useId()
   const [people, setPeople] = useState([])
@@ -20,7 +21,9 @@ export default function PeopleListDialog({ title, emptyMessage, loadPage, onClos
   const close = () => dialog.current?.close()
 
   useEffect(() => {
-    if (!dialog.current.open) dialog.current.showModal()
+    if (dialog.current.open) return
+    dialog.current.showModal()
+    heading.current.focus({ preventScroll: true })
   }, [])
 
   useEffect(() => {
@@ -50,7 +53,7 @@ export default function PeopleListDialog({ title, emptyMessage, loadPage, onClos
       onPointerDown={event => { backdropPress.current = event.target === event.currentTarget }}
       onClick={event => { if (backdropPress.current && event.target === event.currentTarget) close() }}>
       <header className="cm-header">
-        <h2 id={headingId}>{title}</h2>
+        <h2 id={headingId} ref={heading} tabIndex={-1}>{title}</h2>
         <button className="cm-close" type="button" aria-label={`Close ${title.toLowerCase()}`} onClick={close}>
           <CloseIcon size={20} />
         </button>
