@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Share2, Trash2, MapPin } from 'lucide-react'
+import { ImageOff, MapPin, Share2, Trash2 } from 'lucide-react'
 import { Link } from './NavLinks'
 import Dish from './Dish'
 import Comments from './Comments'
@@ -8,11 +8,12 @@ import { RATING, timeAgo } from '../lib/format'
 import Avatar from './Avatar'
 import VerifiedBadge from './VerifiedBadge'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../lib/auth'
+import { useAuth, useModeration } from '../lib/auth'
 import { playLikeSound, tapHaptic } from '../lib/feedback'
 import { useFx } from '../lib/fx'
 import { usePost } from '../lib/post'
 import { needsSquarePostFrame } from '../lib/postMedia'
+import { moderateContent } from '../data/admin'
 import { deleteOwnPost, friendly } from '../data/queries'
 import { shareLink, canteenMapLink } from '../lib/share'
 import '../styles/post-card.css'
@@ -21,7 +22,7 @@ const TAP_TIME = 350
 const TAP_MOVE = 12
 const REACTION_DURATION = 720
 
-function PostMedia({ post, canteen, eager, reaction, onDoubleTap }) {
+function PostMedia({ photo, foodName, canteen, eager, reaction, onDoubleTap }) {
   const [square, setSquare] = useState(false)
   const pointer = useRef(null)
   const lastTap = useRef(null)
@@ -53,11 +54,11 @@ function PostMedia({ post, canteen, eager, reaction, onDoubleTap }) {
   return <div className={'post-media' + (square ? ' square-frame' : '')}
     onPointerDown={startTap} onPointerMove={moveTap} onPointerUp={endTap} onPointerCancel={cancelTap}
     onPointerLeave={e => { if (pointer.current?.id === e.pointerId) cancelTap() }}>
-    {post.photo ? <>
-      {square && <img className="post-photo-blur" src={post.photo} alt="" aria-hidden="true" draggable={false} decoding="async" />}
-      <img className="photo" src={post.photo} alt={post.food.name} loading={loading} decoding="async" draggable={false}
+    {photo ? <>
+      {square && <img className="post-photo-blur" src={photo} alt="" aria-hidden="true" draggable={false} decoding="async" />}
+      <img className="photo" src={photo} alt={foodName} loading={loading} decoding="async" draggable={false}
         onLoad={({ currentTarget: image }) => setSquare(needsSquarePostFrame(image.naturalWidth, image.naturalHeight))}/>
-    </> : <Dish name={post.food.name} colour={canteen?.colour}/>}
+    </> : <Dish name={foodName} colour={canteen?.colour}/>}
     {reaction > 0 && <span key={reaction} className="plate-reaction" aria-hidden="true">
       <span className="plate-reaction-dish"><HeartIcon size={42}/><i/></span>
       <ForkKnifeIcon size={28} className="plate-reaction-cutlery"/>
@@ -74,12 +75,18 @@ export default function PostCard({ post, canteen, index = 0, onLike, onSeen, onD
   const [commentCount,setCommentCount] = useState(post.comments ?? 0)
   const [busy,setBusy] = useState(false)
   const [deleted,setDeleted] = useState(false)
+  const [removedPhotoPath,setRemovedPhotoPath] = useState(null)
   const card = useRef(null)
   const nextReaction = useRef(0)
   const { session } = useAuth()
+  const { allowed } = useModeration()
   const { toast } = useFx()
   const { invalidate, openPostEdit } = usePost()
-  const own = !!supabase && session?.user?.id === post.userId
+  const userId = session?.user?.id
+  const own = !!supabase && !!userId && userId === post.userId
+  const canDeletePost = own || allowed
+  const photo = removedPhotoPath && post.photoPath === removedPhotoPath ? null : post.photo
+  const canDeletePhoto = allowed && !!photo && !!post.photoPath
   useEffect(() => { setCommentCount(post.comments ?? 0) }, [post.id, post.comments])
   useEffect(() => {
     if (!onSeen || !card.current || !('IntersectionObserver' in window)) return
@@ -115,14 +122,29 @@ export default function PostCard({ post, canteen, index = 0, onLike, onSeen, onD
     const result = await shareLink(path, post.food.name + ' · MoraPlates')
     if (result === 'copied') toast('Link copied')
   }
-  const remove = async () => {
-    if (!own || busy || !window.confirm('Delete this plate and its photo? This cannot be undone.')) return
+  const remove = async (photoOnly = false) => {
+    if (busy || (photoOnly ? !canDeletePhoto : !canDeletePost)) return
+    const target = photoOnly ? 'this photo' : photo ? 'this post and its photo' : 'this post'
+    if (!window.confirm(`Delete ${target}? This cannot be undone.`)) return
     setBusy(true)
     try {
-      const result = await deleteOwnPost(post.id,session.user.id)
-      setDeleted(true); onDeleted?.(); invalidate()
-      toast(result.storageRemoved ? 'Plate and photo deleted' : 'Plate deleted; photo cleanup needs attention')
-    } catch (e) { toast(friendly(e)); setBusy(false) }
+      const { storageRemoved } = photoOnly
+        ? await moderateContent('post_photos', post.id, post.photoPath)
+        : allowed ? await moderateContent('posts', post.id) : await deleteOwnPost(post.id, userId)
+      if (photoOnly) setRemovedPhotoPath(post.photoPath)
+      else {
+        setDeleted(true)
+        onDeleted?.()
+      }
+      invalidate()
+      if (photoOnly) toast(storageRemoved ? 'Photo deleted' : 'Photo removed from the post. File cleanup needs attention.')
+      else toast(storageRemoved ? 'Post deleted' : 'Post deleted. Photo cleanup needs attention.')
+    } catch (error) {
+      if (allowed) invalidate()
+      toast(allowed ? error.message || 'Could not delete. Try again.' : friendly(error))
+    } finally {
+      setBusy(false)
+    }
   }
   if (deleted) return null
   return <article ref={card} className="card post social-post rise" style={{'--i':Math.min(index,3)}}>
@@ -132,14 +154,19 @@ export default function PostCard({ post, canteen, index = 0, onLike, onSeen, onD
         <span className="who"><b>{post.author.name}{post.author.verified && <VerifiedBadge />}</b><small>{post.author.faculty ? post.author.faculty + ' · ' : ''}{timeAgo(post.createdAt)}</small></span>
       </Link>
       <span className={'rt '+cls}>{label}</span>
-      {own && <div className="post-owner-actions" role="group" aria-label="Manage your post">
-        <button type="button" className="social-icon" disabled={busy} aria-label="Edit your post" title="Edit your post" onClick={() => openPostEdit(post)}>
+      {canDeletePost && <div className="post-manage-actions" role="group" aria-label={own ? 'Manage your post' : 'Manage post'}>
+        {own && <button type="button" className="social-icon" disabled={busy} aria-label="Edit your post" title="Edit your post" onClick={() => openPostEdit(post)}>
           <PencilIcon size={19} />
-        </button>
-        <button type="button" className="social-icon" disabled={busy} aria-label="Delete your post" onClick={remove}><Trash2 size={19} /></button>
+        </button>}
+        <button type="button" className="social-icon" disabled={busy} aria-label={own ? 'Delete your post' : 'Delete post'} title="Delete post" onClick={() => remove()}><Trash2 size={19} /></button>
       </div>}
     </div>{canteen && <Link className="post-location" to={'/canteens/'+canteen.id}><MapPin size={15}/>{canteen.name}</Link>}</div>
-    <PostMedia key={post.photo ?? post.id} post={post} canteen={canteen} eager={index === 0} reaction={reaction} onDoubleTap={onLike && (() => like(true))}/>
+    <div className="post-media-wrap">
+      <PostMedia key={photo ?? post.id} photo={photo} foodName={post.food.name} canteen={canteen} eager={index === 0} reaction={reaction} onDoubleTap={onLike && (() => like(true))}/>
+      {canDeletePhoto && <button type="button" className="mini post-photo-delete" disabled={busy} onClick={() => remove(true)}>
+        <ImageOff size={17} /> Delete photo
+      </button>}
+    </div>
     <div className="pb">
       <div className="acts">
         <button className={'like'+(post.liked?' on':'')+(post.liked&&pops?' pop':'')} aria-pressed={post.liked} aria-label={post.liked?'Unlike plate':'Like plate'} onClick={() => like()}><HeartIcon key={pops}/><span>{post.likes}</span></button>

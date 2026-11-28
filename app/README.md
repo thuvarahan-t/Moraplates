@@ -67,16 +67,21 @@ Enable the Maps JavaScript API with billing in Google Cloud. Set `VITE_GOOGLE_MA
 - Open any menu item to see its posts. Pin up to three canteens to move them to the top of the canteen list. Account pins follow the signed-in user across devices, and guest pins stay in the browser.
 - Signed-in students can reply to comments and follow profiles. Four earned badges unlock the blue tick. The like button and a double-tap on a post give feedback on supported devices. Tall portraits display in a square over a blurred copy.
 - Authors can edit their post's caption, rating, food, canteen and photo. Signed-in students can update any menu item's name and price, keeping existing posts and ratings linked.
+- Approved content moderators use their regular sign-in to remove posts, post photos, comments, profile photos, and canteen content from the pages where it appears. Deleting a menu item also removes its posts and ratings. Deleting a canteen removes its menu, posts, photos, votes, pins and status reports.
 - The admin console is protected by server-side RPC checks against `public.admin_users`. It manages canteens, foods, content moderation, profile display fields, likes, votes, gallery photos and closure reports. It deliberately does not provision login accounts or assign administrator roles from the browser.
 
 ### Deployment order
 
-1. Back up the existing database and test in a separate Supabase project. Apply pending migrations in filename order before deploying the frontend, including `20261127130000_community_edits.sql` for post and food edits.
+1. Back up the existing database and test in a separate Supabase project. Apply pending migrations in filename order before deploying the frontend, including `20261128100000_content_moderation.sql` for moderation through the regular app.
 2. Verify the administrator's existing account identity independently. In the trusted Supabase SQL editor, insert its verified Auth UUID:
    ```sql
    insert into public.admin_users(user_id) values ('<verified-auth-user-uuid>');
    ```
-   Do not grant admin based on an unverified university email. The known email/password confirmation issue is intentionally unchanged; fix it before public production release.
+   To grant content moderation to a verified existing account, use its Auth UUID in the trusted Supabase SQL editor.
+   ```sql
+   insert into public.content_moderators(user_id) values ('<verified-auth-user-uuid>')
+   on conflict do nothing;
+   ```
 3. Configure SPA fallback to `index.html` so direct /posts/:id, /u/:id and /canteens/:id links work.
 4. Run `npm ci && npm test && npm run build` from app. For browser smoke tests, install Playwright locally (see tests README).
 5. Confirm storage deletion in a disposable test project and review cascade behavior before allowing production admin deletions.

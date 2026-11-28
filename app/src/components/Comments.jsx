@@ -1,9 +1,10 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { useAuth } from '../lib/auth'
+import { useAuth, useModeration } from '../lib/auth'
 import { usePost } from '../lib/post'
 import { supabase } from '../lib/supabase'
 import { useSignInGate } from '../lib/useSignInGate'
 import { addComment, deleteComment, fetchComments, friendly, POST_READS } from '../data/queries'
+import { moderateContent } from '../data/admin'
 import { timeAgo } from '../lib/format'
 import { Link } from './NavLinks'
 import Avatar from './Avatar'
@@ -97,6 +98,7 @@ function CommentRow({ comment, parent, onReply, onDelete, close, busy, activeRef
 
 function CommentThread({ postId, onCount, close }) {
   const { ready, session, profile } = useAuth()
+  const { allowed } = useModeration()
   const { cache } = usePost()
   const gate = useSignInGate()
   const input = useRef(null)
@@ -163,12 +165,15 @@ function CommentThread({ postId, onCount, close }) {
     }
   }
 
-  const remove = async id => {
-    if (busy) return
+  const remove = async ({ id, userId }) => {
+    const own = userId === session?.user?.id
+    if (busy || (!own && !allowed)) return
+    if (!own && !window.confirm('Delete this comment? This cannot be undone.')) return
     setBusy(true)
     setWriteError('')
     try {
-      await deleteComment(id)
+      if (own) await deleteComment(id)
+      else await moderateContent('comments', id)
       cache.invalidate(...POST_READS)
       setThread(previous => ({
         ...previous,
@@ -194,7 +199,7 @@ function CommentThread({ postId, onCount, close }) {
         setWriteError('')
         input.current?.focus()
       } : undefined}
-      onDelete={comment.userId === session?.user?.id ? () => remove(comment.id) : undefined} />
+      onDelete={allowed || comment.userId === session?.user?.id ? () => remove(comment) : undefined} />
   )
 
   return (

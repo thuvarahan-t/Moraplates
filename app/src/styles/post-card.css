@@ -1,4 +1,12 @@
-.post-owner-actions { display: flex; flex: none; align-items: center }
+.post-manage-actions { display: flex; flex: none; align-items: center }
+.post-media-wrap { position: relative }
+.post-photo-delete {
+  position: absolute;
+  z-index: 2;
+  inset: 10px 10px auto auto;
+  min-height: 44px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / .18);
+}
 
 .post-media { position: relative; overflow: hidden; background: var(--soft); touch-action: manipulation }
 .social-post .post-media .photo { width: 100%; height: auto; max-height: none }

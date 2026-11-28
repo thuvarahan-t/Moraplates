@@ -16,14 +16,16 @@ const nextColomboMidnight = time => {
 }
 const users=[]
 let food,post,path,replacementPath,adminCanteen
+let moderatedCanteen
+const moderationPaths = []
 try{
-  for(let i=0;i<2;i++){
+  for(let i=0;i<3;i++){
     const email='test-'+randomUUID()+'@uom.lk',password='Test!'+randomUUID()
     const {user}=check(await service.auth.admin.createUser({email,password,email_confirm:true,user_metadata:{full_name:'Test Foodie '+i}}))
     users.push({id:user.id,client:client(anon)})
     check(await users[i].client.auth.signInWithPassword({email,password}))
   }
-  const a=users[0],b=users[1]
+  const [a, b, moderator] = users
   food=check(await a.client.from('foods').insert({canteen_id:'wala',name:'Test '+randomUUID().slice(0,8),price:200}).select('id').single()).id
   path=a.id+'/'+randomUUID()+'.png'
   const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jT2QAAAAASUVORK5CYII=','base64')
@@ -195,12 +197,118 @@ try{
   assert.equal(check(await b.client.from('posts').select('id').eq('id',post)).length,0)
   post=null;path=null
   check(await b.client.rpc('admin_delete',{kind:'foods',p:{id:food}}));food=null
-  console.log('PASS: photo upload and replacement, owner post edits, shared food edits, seen privacy, closure and reopening, personal pins, admin CRUD, weekly vote totals and switching, owner post and storage deletion')
+
+  const moderate = (client, kind, id, photoPath) => client.rpc('moderate_delete', {
+    kind, p: { id, ...(photoPath ? { photo_path: photoPath } : {}) },
+  })
+  const uploadModerationPhoto = async () => {
+    const file = a.id + '/' + randomUUID() + '.png'
+    moderationPaths.push(file)
+    check(await a.client.storage.from('photos').upload(file, png, { contentType: 'image/png' }))
+    return file
+  }
+  const sharedPhoto = await uploadModerationPhoto()
+  const coverPhoto = await uploadModerationPhoto()
+  const foodPhoto = await uploadModerationPhoto()
+  const moderationCanteen = {
+    name: 'Moderation ' + randomUUID().slice(0, 8), location: 'Test campus',
+    lat: 6.7966, lng: 79.9018, opens_at: 7, closes_at: 18,
+  }
+  moderatedCanteen = check(await a.client.from('canteens').insert({
+    ...moderationCanteen, photo_path: coverPhoto,
+  }).select('id').single()).id
+  const moderatedFood = check(await a.client.from('foods').insert({
+    canteen_id: moderatedCanteen, name: 'Moderation test', price: 250, photo_path: foodPhoto,
+  }).select('id').single()).id
+  const postPayload = {
+    canteen_id: moderatedCanteen, food_id: moderatedFood, rating: 'super', caption: 'Keep this plate',
+  }
+  assert.equal((await a.client.from('posts').insert(postPayload)).error?.code, '42501', 'New posts still need a photo')
+  const moderatedPost = check(await a.client.from('posts').insert({
+    ...postPayload, photo_path: sharedPhoto,
+  }).select('id').single()).id
+  const moderatedComment = check(await a.client.from('comments').insert({
+    post_id: moderatedPost, body: 'Integration comment',
+  }).select('id').single()).id
+  const moderatedGallery = check(await a.client.from('canteen_photos').insert({
+    canteen_id: moderatedCanteen, photo_path: sharedPhoto,
+  }).select('id').single()).id
+  check(await b.client.rpc('admin_save', {
+    kind: 'canteens', p: { ...moderationCanteen, id: moderatedCanteen, primary_photo_id: moderatedGallery },
+  }))
+
+  assert.ok((await moderate(guest, 'posts', moderatedPost)).error)
+  assert.equal(check(await moderator.client.rpc('is_content_moderator')), false)
+  assert.equal((await moderate(moderator.client, 'posts', moderatedPost)).error?.code, '42501')
+  assert.ok((await moderator.client.from('content_moderators').insert({ user_id: moderator.id })).error)
+  check(await service.from('content_moderators').insert({ user_id: moderator.id }))
+  assert.equal(check(await moderator.client.rpc('is_content_moderator')), true)
+  assert.equal(check(await moderator.client.rpc('is_admin')), false)
+  assert.equal(check(await b.client.rpc('is_content_moderator')), true)
+  assert.equal((await moderate(moderator.client, 'votes', moderatedCanteen)).error?.code, '22023')
+  assert.equal((await moderator.client.rpc('admin_delete', {
+    kind: 'posts', p: { id: moderatedPost },
+  })).error?.code, '42501')
+
+  const removeAsModerator = path => moderator.client.storage.from('photos').remove([path])
+  const hasPhoto = async path => !(await a.client.storage.from('photos').download(path)).error
+  await removeAsModerator(sharedPhoto)
+  assert.equal(await hasPhoto(sharedPhoto), true, 'The role cannot remove a photo before it is queued')
+  assert.equal((await moderate(moderator.client, 'post_photos', moderatedPost, coverPhoto)).error?.code, 'P0002')
+  assert.deepEqual(check(await moderate(moderator.client, 'post_photos', moderatedPost, sharedPhoto)), [])
+  assert.deepEqual(check(await guest.from('posts').select('caption, photo_path').eq('id', moderatedPost).single()), {
+    caption: 'Keep this plate', photo_path: null,
+  })
+  await removeAsModerator(sharedPhoto)
+  assert.equal(await hasPhoto(sharedPhoto), true, 'The gallery still uses the file')
+  assert.deepEqual(check(await moderate(moderator.client, 'canteen_photos', moderatedGallery, sharedPhoto)), [sharedPhoto])
+  const canteenFields = fields => guest.from('canteen_standings').select(fields).eq('id', moderatedCanteen).single()
+  assert.equal(check(await canteenFields('primary_photo_id')).primary_photo_id, null)
+
+  check(await a.client.from('profiles').update({ avatar_path: sharedPhoto }).eq('id', a.id))
+  await removeAsModerator(sharedPhoto)
+  assert.equal(await hasPhoto(sharedPhoto), true, 'Storage checks references again at deletion time')
+  assert.deepEqual(check(await moderate(moderator.client, 'profile_avatars', a.id, sharedPhoto)), [sharedPhoto])
+  check(await removeAsModerator(sharedPhoto))
+  assert.equal(await hasPhoto(sharedPhoto), false, 'The role can remove a queued file from another account')
+
+  assert.deepEqual(check(await moderate(moderator.client, 'canteen_covers', moderatedCanteen, coverPhoto)), [coverPhoto])
+  assert.equal(check(await canteenFields('photo_path')).photo_path, null)
+  check(await removeAsModerator(coverPhoto))
+  assert.equal(await hasPhoto(coverPhoto), false)
+  assert.deepEqual(check(await moderate(moderator.client, 'comments', moderatedComment)), [])
+  assert.equal(check(await guest.from('comments').select('id').eq('id', moderatedComment).maybeSingle()), null)
+  assert.deepEqual(check(await moderate(moderator.client, 'posts', moderatedPost)), [])
+  assert.equal(check(await guest.from('posts').select('id').eq('id', moderatedPost).maybeSingle()), null)
+
+  const cascadePost = check(await a.client.from('posts').insert({
+    ...postPayload, photo_path: foodPhoto,
+  }).select('id').single()).id
+  assert.deepEqual(check(await moderate(moderator.client, 'food_photos', moderatedFood, foodPhoto)), [])
+  assert.deepEqual(check(await moderate(moderator.client, 'foods', moderatedFood)), [foodPhoto])
+  assert.equal(check(await guest.from('posts').select('id').eq('id', cascadePost).maybeSingle()), null)
+  check(await removeAsModerator(foodPhoto))
+  assert.equal(await hasPhoto(foodPhoto), false)
+
+  check(await a.client.rpc('report_canteen_closed_today', { canteen: moderatedCanteen }))
+  check(await b.client.rpc('report_canteen_open', { canteen: moderatedCanteen }))
+  assert.equal(check(await canteenFields('last_reported_status')).last_reported_status, 'open')
+  check(await moderate(moderator.client, 'canteen_status_reports', moderatedCanteen))
+  assert.deepEqual(check(await canteenFields('last_reported_status, reported_closed_until, reported_open_until')), {
+    last_reported_status: null, reported_closed_until: null, reported_open_until: null,
+  })
+  check(await moderate(moderator.client, 'canteens', moderatedCanteen))
+  assert.equal(check(await guest.from('canteens').select('id').eq('id', moderatedCanteen).maybeSingle()), null)
+  moderatedCanteen = null
+
+  console.log('PASS: photo upload and replacement, owner post edits, shared food edits, seen privacy, closure and reopening, personal pins, admin CRUD, weekly vote totals and switching, owner deletion, scoped moderation and cross-owner storage cleanup')
 }finally{
   if(path)await service.storage.from('photos').remove([path])
   if(replacementPath)await service.storage.from('photos').remove([replacementPath])
   if(post)await service.from('posts').delete().eq('id',post)
   if(food)await service.from('foods').delete().eq('id',food)
   if(adminCanteen)await service.from('canteens').delete().eq('id',adminCanteen)
+  if(moderatedCanteen)await service.from('canteens').delete().eq('id',moderatedCanteen)
+  if(moderationPaths.length)await service.storage.from('photos').remove(moderationPaths)
   for(const user of users)await service.auth.admin.deleteUser(user.id)
 }

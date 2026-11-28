@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { LoaderCircle, Navigation, Share2 } from 'lucide-react'
+import { Images, LoaderCircle, Navigation, Share2 } from 'lucide-react'
 import CanteenClosure from '../components/CanteenClosure'
+import CanteenPhotoManager from '../components/CanteenPhotoManager'
 import { exportPhoto } from '../lib/photoEdit'
 import { shareLink, canteenDirectionsLink } from '../lib/share'
 import { supabase } from '../lib/supabase'
 import { SAMPLE_CANTEENS, SAMPLE_FOODS } from '../data/sample'
 import { samplePosts } from '../data/feed'
-import { useParams } from 'react-router'
+import { useNavigate, useParams } from 'react-router'
 import { Link } from '../components/NavLinks'
 import CountUp from '../components/CountUp'
 import Loader from '../components/Loader'
@@ -18,9 +19,10 @@ import { BackIcon, CameraIcon, CheckIcon, HeartIcon, MapIcon, PinIcon, TrashIcon
 import Slideshow, { Credit, Dots } from '../components/Slideshow'
 import { useQuery } from '../data/useQuery'
 import { queryKey } from '../data/queryCache'
-import { addCanteenPhoto, addFood, pinCanteen, castVote, deleteCanteenPhoto, fetchCanteenPage, friendly, removeVote, reportCanteenStatus } from '../data/queries'
+import { addCanteenPhoto, addFood, pinCanteen, castVote, fetchCanteenPage, friendly, removeVote, reportCanteenStatus } from '../data/queries'
 import { useLikeToggle } from '../data/feed'
 import { useAuth } from '../lib/auth'
+import { useCanteenRemoval } from '../lib/useCanteenRemoval'
 import { tapHaptic } from '../lib/feedback'
 import { centreOf, useFx } from '../lib/fx'
 import { usePost } from '../lib/post'
@@ -32,6 +34,7 @@ import { canteenStatusLabel, canteenSuper, hourLabel, isOpen, percent, ratingChi
 /** One canteen: vote, menu, add food, latest plates (renderCanteen() in index.html). */
 export default function Canteen() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const { session } = useAuth()
   const uid = session?.user?.id
   const { data, loading, error } = useQuery(queryKey('canteen', id), () => supabase ? fetchCanteenPage(id, uid) : Promise.resolve((()=>{const c=SAMPLE_CANTEENS.find(x=>x.id===id);return c?{canteen:c,rank:1+SAMPLE_CANTEENS.filter(x=>x.votes>c.votes).length,foods:SAMPLE_FOODS.filter(f=>f.canteenId===id),posts:samplePosts().filter(p=>p.canteenId===id),myVote:null,photos:[]}:null})()))
@@ -40,6 +43,8 @@ export default function Canteen() {
   const gate = useSignInGate()
   const voteBtn = useRef(null)
   const photoInput = useRef(null)
+  const removal = useCanteenRemoval()
+  const [managingCanteen, setManagingCanteen] = useState(null)
   const [voting, setVoting] = useState(false)
   const [localVote,setLocalVote]=useState(null)
   useEffect(()=>{if(data)setLocalVote({id:data.myVote,votes:data.canteen.votes})},[data])
@@ -139,18 +144,20 @@ export default function Canteen() {
     if (gate('to add photos')) photoInput.current?.click()
   }
 
-  const deletePhoto = async p => {
-    if (!window.confirm('Delete this photo?')) return
-    try {
-      const ok=await deleteCanteenPhoto(p)
-      toast(ok?'Photo deleted':'Photo removed from gallery; storage cleanup needs attention')
-      invalidate()
-    } catch (err) {
-      toast(friendly(err))
-    }
+  const deleteCanteen = async () => {
+    const deleted = await removal.remove('canteens', c.id, {
+      confirmation: `Delete ${c.name}? Its menu, posts, photos, and votes will also be deleted. This cannot be undone.`,
+      success: `${c.name} deleted`,
+    })
+    if (deleted) navigate('/canteens', { replace: true })
   }
 
-  const closurePanel = <CanteenClosure canteen={c} now={now} busy={reportBusy} onAction={closure} />
+  const clearStatusReports = () => removal.remove('canteen_status_reports', c.id, {
+    confirmation: `Clear all opening and closure reports for ${c.name}? The regular hours will be used again.`,
+    success: 'Canteen status reports cleared',
+  })
+  const closurePanel = <CanteenClosure canteen={c} now={now} busy={reportBusy || removal.busy} onAction={closure}
+    onClearReports={removal.allowed && c.lastReportedAt ? clearStatusReports : undefined} />
 
   const info = (
     <div className="ctx">
@@ -181,6 +188,12 @@ export default function Canteen() {
               e.currentTarget.value = ''
               if (file) addPhoto(file)
             }} />
+          {removal.allowed && (photos.length > 0 || c.photoPath) && (
+            <button type="button" className="social-icon" aria-label="Manage canteen photos" title="Manage canteen photos"
+              disabled={removal.busy} onClick={() => setManagingCanteen(c.id)}>
+              <Images size={19} aria-hidden="true" />
+            </button>
+          )}
           <button type="button" className="social-icon" aria-label="Share" title="Share" onClick={share}>
             <Share2 size={19} aria-hidden="true" />
           </button>
@@ -195,7 +208,17 @@ export default function Canteen() {
 
   return (
     <section className="view"><div className="band"><div className="wrap">
-      <Back />
+      {removal.allowed ? (
+        <div className="canteen-page-tools">
+          <Back />
+          <button type="button" className="mini canteen-delete-action" disabled={removal.busy} onClick={deleteCanteen}>
+            <TrashIcon size={18} />Delete canteen
+          </button>
+        </div>
+      ) : <Back />}
+      {removal.allowed && managingCanteen === c.id && (
+        <CanteenPhotoManager key={c.id} canteen={c} removal={removal} onClose={() => setManagingCanteen(null)} />
+      )}
       {photos.length ? (
         <div className="cbanner rise">
           <div className="cbanner-photo">
@@ -203,8 +226,9 @@ export default function Canteen() {
               {(cur, i, goTo) => (
                 <>
                   <Credit name={cur.by} />
-                  {cur.userId === uid && (
-                    <button className="gbtn ptrash" onClick={() => deletePhoto(cur)} aria-label="Delete this photo" title="Delete your photo"><TrashIcon /></button>
+                  {removal.canRemovePhoto(cur) && (
+                    <button type="button" className="gbtn ptrash" disabled={removal.busy} onClick={() => removal.removePhoto(cur)}
+                      aria-label="Delete this photo" title="Delete this photo"><TrashIcon /></button>
                   )}
                   <Dots count={photos.length} index={i} goTo={goTo} />
                 </>
@@ -255,6 +279,13 @@ export default function Canteen() {
                 <span className={'rt ' + k}>{l}</span>
                 <div className="food-menu-actions">
                   <EditFoodButton food={f} iconOnly />
+                  {removal.allowed && (
+                    <button type="button" className="social-icon canteen-delete-action" disabled={removal.busy} aria-label={`Delete ${f.name}`}
+                      title="Delete food" onClick={() => removal.remove('foods', f.id, {
+                        confirmation: `Delete ${f.name} from the menu? Its posts and ratings will also be deleted. This cannot be undone.`,
+                        success: `${f.name} deleted`,
+                      })}><TrashIcon size={18} /></button>
+                  )}
                   <button className="mini" onClick={() => openPost(c.id, f.id)} aria-label={`Post a plate of ${f.name}`}>Post</button>
                 </div>
               </div>

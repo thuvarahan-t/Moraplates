@@ -2,23 +2,28 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Link } from './NavLinks'
 import { Credit } from './Slideshow'
+import { TrashIcon } from './icons'
 import { useQuery } from '../data/useQuery'
 import { fetchHomeCanteenPhotos } from '../data/queries'
 import { homeCanteenSlides } from '../lib/food'
 import { REDUCED_MOTION } from '../lib/motion'
 import { supabase } from '../lib/supabase'
+import { useCanteenRemoval } from '../lib/useCanteenRemoval'
 
 const NEXT_PHOTO_MS = 5000
 const scrollIndex = el => Math.round(el.scrollLeft / el.clientWidth)
 
 export default function HomeBanner({ canteens }) {
   const { data: photos } = useQuery('home-canteen-photos', fetchHomeCanteenPhotos, { enabled: !!supabase })
+  const removal = useCanteenRemoval()
   const track = useRef(null)
+  const removeButton = useRef(null)
   const target = useRef(null)
   const [at, setAt] = useState(0)
   const slides = homeCanteenSlides(canteens, photos)
   const count = slides.length
   const active = Math.min(at, count - 1)
+  const activeSlide = slides[active]
 
   const move = useCallback(direction => {
     const el = track.current
@@ -33,7 +38,8 @@ export default function HomeBanner({ canteens }) {
   useEffect(() => {
     if (REDUCED_MOTION || count < 2) return
     const timer = setInterval(() => {
-      if (!document.hidden && !track.current?.parentElement.querySelector(':focus-visible')) move(1)
+      if (!document.hidden && !removeButton.current?.matches(':hover, :focus') &&
+          !track.current?.parentElement.querySelector(':focus-visible')) move(1)
     }, NEXT_PHOTO_MS)
     return () => clearInterval(timer)
   }, [active, count, move])
@@ -45,6 +51,12 @@ export default function HomeBanner({ canteens }) {
     if (!el.clientWidth) return
     if (target.current !== null && Math.abs(el.scrollLeft - target.current * el.clientWidth) < 1) target.current = null
     setAt(Math.max(0, scrollIndex(el)))
+  }
+
+  function removeCurrentPhoto() {
+    const { canteen, photo } = activeSlide
+    if (photo.path) removal.removePhoto(photo, { confirmation: `Delete this slideshow photo for ${canteen.name}?` })
+    else removal.removeCover(canteen)
   }
 
   return (
@@ -64,6 +76,12 @@ export default function HomeBanner({ canteens }) {
           </Link>
         ))}
       </div>
+      {removal.allowed && (activeSlide.photo.path || activeSlide.canteen.photoPath) && (
+        <button ref={removeButton} type="button" className="gbtn ptrash" disabled={removal.busy}
+          aria-label={`Delete slideshow photo for ${activeSlide.canteen.name}`} title="Delete slideshow photo" onClick={removeCurrentPhoto}>
+          <TrashIcon />
+        </button>
+      )}
       {count > 1 && <>
         <button className="bnr-arrow bnr-prev" type="button" aria-label="Previous photo" onClick={() => move(-1)}><ChevronLeft aria-hidden="true" /></button>
         <button className="bnr-arrow bnr-next" type="button" aria-label="Next photo" onClick={() => move(1)}><ChevronRight aria-hidden="true" /></button>

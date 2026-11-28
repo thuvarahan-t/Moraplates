@@ -2,8 +2,10 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { ALLOWED_EMAIL_DOMAIN, createRecoveryClient, supabase } from './supabase'
 import { SAMPLE_ME } from '../data/sample'
 import { photoUrl } from './photos'
+import { checkModeration } from '../data/admin'
 
 const AuthContext = createContext(null)
+const noModeration = { allowed: false }
 
 const toProfile = r => r && { id: r.id, fullName: r.full_name, faculty: r.faculty, batch: r.batch, avatarPath: r.avatar_path, avatar: photoUrl(r.avatar_path) }
 
@@ -37,6 +39,7 @@ export function AuthProvider({ children }) {
   const [loadedProfile, setProfile] = useState(supabase ? null : SAMPLE_ME)
   const [ready, setReady] = useState(!supabase)
   const [tick, setTick] = useState(0)
+  const [moderation, setModeration] = useState(null)
   const recovery = useRef(null)
 
   useEffect(() => {
@@ -51,6 +54,17 @@ export function AuthProvider({ children }) {
 
   const userId = session?.user?.id
   const profile = supabase && loadedProfile?.id !== userId ? null : loadedProfile
+  const currentModeration = moderation && moderation.userId === userId ? moderation : noModeration
+  useEffect(() => {
+    setModeration(null)
+    if (!userId) return
+    let live = true
+    checkModeration().then(allowed => {
+      if (live) setModeration({ userId, allowed: allowed === true })
+    }).catch(() => {})
+    return () => { live = false }
+  }, [userId])
+
   useEffect(() => {
     if (!supabase) return
     if (!userId) { setProfile(null); return }
@@ -70,6 +84,7 @@ export function AuthProvider({ children }) {
     ready,
     session,
     profile,
+    moderation: currentModeration,
     refreshProfile,
     /** Email + password sign-in. Returns an error message, or null on success. */
     async signIn(username, password) {
@@ -150,9 +165,10 @@ export function AuthProvider({ children }) {
     async signOut() {
       if (supabase) await supabase.auth.signOut()
     },
-  }), [ready, session, profile, refreshProfile, endRecovery])
+  }), [ready, session, profile, currentModeration, refreshProfile, endRecovery])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
 export const useAuth = () => useContext(AuthContext)
+export const useModeration = () => useAuth().moderation

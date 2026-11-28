@@ -47,8 +47,55 @@
 .canteen-pin[aria-pressed="true"] svg { fill: color-mix(in srgb, var(--brand) 22%, transparent); }
 .canteen-pin-error { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
 .food-post-link { color: inherit; text-decoration: none; }
+.mrow .food-post-link { min-width: 0; overflow-wrap: anywhere; }
 .food-post-link:hover b, .food-post-link:focus-visible b { text-decoration: underline; }
 .food-plates-heading h1 { font-size: clamp(25px, 5vw, 36px); }
+
+.canteen-page-tools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.canteen-page-tools .back { margin-bottom: 0; }
+.canteen-delete-action { color: #a33220; }
+.ptrash:disabled { opacity: .6; cursor: wait; }
+.canteen-photo-manager { max-height: calc(100dvh - 24px); }
+.canteen-photo-manager h2 { font-size: clamp(23px, 5vw, 30px); }
+.canteen-managed-photos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.canteen-managed-photos li {
+  min-width: 0;
+  overflow: hidden;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.canteen-managed-photos img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+.canteen-managed-photo-actions, .canteen-photo-manager-actions, .food-moderation-photo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.canteen-managed-photo-actions { padding-inline-start: 8px; justify-content: space-between; }
+.canteen-managed-photo-actions span { min-width: 0; overflow-wrap: anywhere; font-size: 13px; }
+.canteen-managed-photo-actions small { display: block; color: var(--mut); }
+.canteen-photo-manager-actions { flex-wrap: wrap; justify-content: flex-end; }
+.food-moderation-photo { padding: 8px; margin-bottom: 12px; }
+.food-moderation-photo img { width: 80px; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; }
 
 .map-loading { display: grid; place-items: center; color: var(--mut); }
 .map-google-link { align-self: flex-start; margin-inline-start: 4px; text-decoration: none; }

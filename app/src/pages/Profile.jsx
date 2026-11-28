@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import People from '../components/People'
 import { exportPhoto } from '../lib/photoEdit'
-import { checkAdmin } from '../data/admin'
+import { checkAdmin, moderateContent } from '../data/admin'
 import { samplePosts } from '../data/feed'
 import { Navigate, useNavigate, useParams } from 'react-router'
 import { Link } from '../components/NavLinks'
@@ -11,7 +11,7 @@ import CountUp from '../components/CountUp'
 import Dish from '../components/Dish'
 import VerifiedBadge from '../components/VerifiedBadge'
 import { BackIcon, CameraIcon, CheckIcon, HeartIcon, LockIcon, LogOutIcon, PencilIcon } from '../components/icons'
-import { useAuth } from '../lib/auth'
+import { useAuth, useModeration } from '../lib/auth'
 import { badgesFor, isVerifiedProfile } from '../lib/badges'
 import { useFx } from '../lib/fx'
 import { RATING } from '../lib/format'
@@ -77,6 +77,7 @@ export function UserProfile() {
           <b>{p.fullName}{isVerifiedProfile(data.stats) && <VerifiedBadge />}</b>
           <span style={{ color: 'var(--mut)' }}>{[p.faculty, p.batch].filter(Boolean).join(' · ') || 'Mora student'}</span>
           <ProfileFollows key={`${id}:${uid ?? ''}`} userId={id} viewerId={uid} />
+          <RemoveProfilePhoto key={id} profile={p} />
         </div>
       </>}
       stats={data.stats}
@@ -137,6 +138,7 @@ function OwnProfile({ uid, email, profile, details }) {
           <ProfileFollows key={uid} userId={uid} viewerId={uid} />
         </div>
         <div className="pro-acts">
+          <RemoveProfilePhoto profile={profile} disabled={uploading} onRemoved={refreshProfile} />
           <button className="btn sm ghost" onClick={() => setEditing(v => !v)}>{editing ? 'Close' : <><PencilIcon />Edit profile</>}</button>
           <button className="btn sm" onClick={() => openPost()}>Post your plate</button>
         </div>
@@ -163,6 +165,34 @@ function OwnProfile({ uid, email, profile, details }) {
       after={<div className="cacts">{showAdmin === true && <Link className="btn sm" to="/admin">Admin console</Link>}<InstallButton/><button className="btn ghost sm signout" onClick={leave}><LogOutIcon />Sign out</button></div>}
     />
   )
+}
+
+function RemoveProfilePhoto({ profile, disabled, onRemoved }) {
+  const { allowed } = useModeration()
+  const { invalidate } = usePost()
+  const { toast } = useFx()
+  const [busy, setBusy] = useState(false)
+  const [removedPath, setRemovedPath] = useState(null)
+  const { id, avatarPath } = profile
+  if (!allowed || !avatarPath || avatarPath === removedPath) return null
+
+  async function remove() {
+    if (busy || disabled || !window.confirm('Remove this profile photo?')) return
+    setBusy(true)
+    try {
+      const { storageRemoved } = await moderateContent('profile_avatars', id, avatarPath)
+      setRemovedPath(avatarPath)
+      onRemoved?.()
+      invalidate()
+      toast(storageRemoved ? 'Profile photo removed' : 'Profile photo removed. File cleanup needs attention.')
+    } catch (error) {
+      toast(friendly(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return <button className="cm-action" type="button" disabled={busy || disabled} onClick={remove}>Remove profile photo</button>
 }
 
 function ProfileFollows({ userId, viewerId }) {
