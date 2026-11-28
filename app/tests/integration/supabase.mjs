@@ -9,6 +9,16 @@ assert.ok(['127.0.0.1','localhost'].includes(new URL(url).hostname),'Refusing no
 const client=key=>createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}})
 const service=client(serviceKey)
 const check=({data,error})=>{if(error)throw error;return data}
+async function withDeadline(promise, label) {
+  let timer
+  try {
+    return await Promise.race([promise, new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(label)), 15_000)
+    })])
+  } finally {
+    clearTimeout(timer)
+  }
+}
 const nextColomboMidnight = time => {
   const day = 24 * 60 * 60_000
   const offset = 330 * 60_000
@@ -40,7 +50,28 @@ try{
     name: foodChanges.new_name.trim(), price: 275, canteen_id: 'wala', created_by: a.id,
   })
 
-  check(await b.client.from('likes').insert({ post_id: post }))
+  const session = check(await a.client.auth.getSession()).session
+  await a.client.realtime.setAuth(session.access_token)
+  const notificationChannel = a.client.channel(`notifications:${a.id}`, {
+    config: { private: true, broadcast: { replication_ready: true } },
+  })
+  const signal = new Promise(resolve => notificationChannel.on('broadcast', { event: 'changed' }, resolve))
+  const replicationReady = new Promise(resolve => notificationChannel.on('system', '*', ({ extension, status }) => {
+    if (extension === 'system' && status === 'ok') resolve()
+  }))
+  const joined = new Promise((resolve, reject) => notificationChannel.subscribe(status => {
+    if (status === 'SUBSCRIBED') resolve()
+    else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') reject(new Error(`Private notification channel: ${status}`))
+  }))
+  try {
+    // The socket join can finish before the server starts streaming database broadcasts.
+    await withDeadline(Promise.all([joined, replicationReady]), 'Notification replication was not ready')
+    check(await b.client.from('likes').insert({ post_id: post }))
+    const { payload } = await withDeadline(signal, 'The like did not signal the recipient')
+    assert.ok(payload && Object.keys(payload).every(key => key === 'id'), 'Signal must only carry transport metadata')
+  } finally {
+    await a.client.removeChannel(notificationChannel)
+  }
   check(await moderator.client.from('likes').insert({ post_id: post }))
   const likerPage = afterId => guest.rpc('post_liker_list', { target: post, after_id: afterId, page_size: 1 })
   const firstLiker = check(await likerPage(null))[0]
@@ -66,6 +97,35 @@ try{
   assert.deepEqual(check(await a.client.from('profile_follows').select('followed_id')), [{ followed_id: b.id }])
   check(await a.client.from('profile_follows').delete().eq('follower_id', a.id).eq('followed_id', b.id))
   assert.deepEqual(check(await followers(null)).map(person => person.id), [moderator.id])
+
+  const inbox = async client => check(await client.from('notifications')
+    .select('id, kind, recipient_id, actor_id, post_id, read_at, actor:profiles!notifications_actor_id_fkey(id, full_name)')
+    .order('id', { ascending: false }))
+  assert.ok((await guest.from('notifications').select('id')).error, 'Guest inbox access is denied')
+  assert.deepEqual(await inbox(moderator.client), [], 'Only recipients can read notifications')
+  const incoming = await inbox(a.client)
+  assert.deepEqual(incoming.map(row => [row.kind, row.actor_id, row.post_id]), [
+    ['follow', b.id, null], ['like', moderator.id, post], ['like', b.id, post],
+  ])
+  assert.ok(incoming.every(row => row.recipient_id === a.id && row.read_at === null && row.actor.id === row.actor_id))
+  assert.deepEqual((await inbox(b.client)).map(row => row.actor_id), [moderator.id, a.id], 'Follow events survive unfollow')
+  assert.ok((await b.client.from('notifications').insert({ recipient_id: a.id, actor_id: b.id, kind: 'follow' })).error)
+  assert.ok((await a.client.from('notifications').update({ kind: 'follow' }).eq('id', incoming[1].id)).error)
+  const readAt = new Date().toISOString()
+  assert.deepEqual(check(await b.client.from('notifications').update({ read_at: readAt }).eq('id', incoming[0].id).select('id')), [])
+  const markRead = (filter, id) => a.client.from('notifications').update({ read_at: readAt })
+    .eq('recipient_id', a.id).is('read_at', null).filter('id', filter, id).select('id')
+  assert.deepEqual(check(await markRead('eq', incoming[0].id)), [{ id: incoming[0].id }])
+  assert.equal(check(await markRead('lte', incoming[0].id)).length, 2)
+  assert.ok((await inbox(a.client)).every(row => !!row.read_at))
+
+  check(await follow(a.client, b.id))
+  check(await moderator.client.from('likes').insert({ post_id: post }))
+  check(await a.client.from('likes').insert({ post_id: post }))
+  assert.equal((await inbox(a.client)).length, 3, 'Repeated and self likes do not create extra notifications')
+  assert.equal((await inbox(b.client)).length, 2, 'A repeated follow does not create an extra notification')
+  check(await a.client.from('likes').delete().eq('post_id', post).eq('user_id', a.id))
+  check(await moderator.client.from('likes').delete().eq('post_id', post).eq('user_id', moderator.id))
 
   const postDetails = async () => check(await guest.from('posts')
     .select('created_at, user_id, caption, rating, photo_path, food_id, likes(count)').eq('id', post).single())
@@ -221,6 +281,7 @@ try{
   check(await a.client.storage.from('photos').remove([path]))
   assert.ok((await a.client.storage.from('photos').download(path)).error,'Owner photo must be removed')
   assert.equal(check(await b.client.from('posts').select('id').eq('id',post)).length,0)
+  assert.deepEqual((await inbox(a.client)).map(row => row.kind), ['follow'], 'Deleting a post removes its like notifications')
   post=null;path=null
   check(await b.client.rpc('admin_delete',{kind:'foods',p:{id:food}}));food=null
 
@@ -327,7 +388,7 @@ try{
   assert.equal(check(await guest.from('canteens').select('id').eq('id', moderatedCanteen).maybeSingle()), null)
   moderatedCanteen = null
 
-  console.log('PASS: photo upload and replacement, owner post edits, shared food edits, public follow and like lists, seen privacy, closure and reopening, personal pins, admin CRUD, weekly vote totals and switching, owner deletion, scoped moderation and cross-owner storage cleanup')
+  console.log('PASS: photo upload and replacement, owner post edits, shared food edits, public follow and like lists, private notification delivery and read state, seen privacy, closure and reopening, personal pins, admin CRUD, weekly vote totals and switching, owner deletion, scoped moderation and cross-owner storage cleanup')
 }finally{
   if(path)await service.storage.from('photos').remove([path])
   if(replacementPath)await service.storage.from('photos').remove([replacementPath])

@@ -47,7 +47,16 @@ async function openPost(page, viewer) {
 
 test('visitors can open a post’s liker list without toggling the heart', async ({ page }) => {
   const { listRequests } = await openPost(page)
-  await page.getByRole('button', { name: 'View 1 like', exact: true }).tap()
+  const count = page.getByRole('button', { name: 'View 1 like', exact: true })
+  const spacing = await count.evaluate(button => {
+    const heart = button.previousElementSibling.querySelector('svg').getBoundingClientRect()
+    const label = document.createRange()
+    label.selectNodeContents(button)
+    return label.getBoundingClientRect().left - heart.right
+  })
+  expect(spacing).toBeGreaterThan(0)
+  expect(spacing).toBeLessThanOrEqual(8)
+  await count.tap()
   const dialog = page.getByRole('dialog', { name: 'Likes' })
   await expect(dialog.getByRole('link', { name: /First Liker/ })).toHaveAttribute('href', `/u/${authorId}`)
   expect(listRequests[0]).toEqual({ target: postId, after_id: null, page_size: 25 })

@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef } from 'react'
 import { useLocation } from 'react-router'
 import { Link, NavLink } from './NavLinks'
+import NotificationBell from './NotificationBell'
 import { PlusIcon, UserIcon } from './icons'
 import { usePost } from '../lib/post'
 import { initialsOf, useAuth } from '../lib/auth'
@@ -52,6 +53,7 @@ export default function Header() {
         </nav>
         {supabase && !session && <Link className="btn sm ghost" to="/welcome">Sign in</Link>}
         <button className="btn sm" onClick={openPost}><PlusIcon />Post your plate</button>
+        {supabase && session && <NotificationBell key={session.user.id} />}
         <Link className="me" to={profile ? '/profile' : '/welcome'} aria-label={profile ? 'Your profile' : 'Sign in'}>
           {profile?.avatar ? <img src={profile.avatar} alt="" /> : profile ? initialsOf(profile.fullName) : <UserIcon />}
         </Link>
