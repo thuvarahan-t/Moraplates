@@ -24,6 +24,26 @@
 .profile-follows .btn { min-height: 36px }
 .profile-follows-retry { align-self: flex-start }
 
+.profile-follow-counts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 12px;
+}
+
+.profile-follow-counts button {
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.profile-follow-counts button strong { color: var(--ink) }
+.profile-follow-counts button:hover { color: var(--brand); text-decoration: underline }
+
 .cm-action {
   min-height: 26px;
   padding: 2px 0;

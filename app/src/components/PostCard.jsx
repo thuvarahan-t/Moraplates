@@ -1,19 +1,21 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ImageOff, MapPin, Share2, Trash2 } from 'lucide-react'
 import { Link } from './NavLinks'
 import Dish from './Dish'
 import Comments from './Comments'
+import PeopleListDialog from './PeopleListDialog'
 import { CommentIcon, ForkKnifeIcon, HeartIcon, PencilIcon, SparkIcon } from './icons'
-import { RATING, timeAgo } from '../lib/format'
+import { plural, RATING, timeAgo } from '../lib/format'
 import Avatar from './Avatar'
 import VerifiedBadge from './VerifiedBadge'
 import { supabase } from '../lib/supabase'
 import { useAuth, useModeration } from '../lib/auth'
 import { playLikeSound, tapHaptic } from '../lib/feedback'
 import { useFx } from '../lib/fx'
-import { usePost } from '../lib/post'
+import { useFollowAction, usePost } from '../lib/post'
 import { needsSquarePostFrame } from '../lib/postMedia'
 import { moderateContent } from '../data/admin'
+import { fetchPostLikers } from '../data/peopleLists'
 import { deleteOwnPost, friendly } from '../data/queries'
 import { shareLink, canteenMapLink } from '../lib/share'
 import '../styles/post-card.css'
@@ -67,11 +69,12 @@ function PostMedia({ photo, foodName, canteen, eager, reaction, onDoubleTap }) {
   </div>
 }
 
-export default function PostCard({ post, canteen, index = 0, onLike, onSeen, onDeleted }) {
+export default function PostCard({ post, canteen, index = 0, showFollow = false, onLike, onSeen, onDeleted }) {
   const [label, cls] = RATING[post.rating] ?? ['Plate','']
   const [pops,setPops] = useState(0)
   const [reaction,setReaction] = useState(0)
   const [open,setOpen] = useState(false)
+  const [likesOpen, setLikesOpen] = useState(false)
   const [commentCount,setCommentCount] = useState(post.comments ?? 0)
   const [busy,setBusy] = useState(false)
   const [deleted,setDeleted] = useState(false)
@@ -81,9 +84,16 @@ export default function PostCard({ post, canteen, index = 0, onLike, onSeen, onD
   const { session } = useAuth()
   const { allowed } = useModeration()
   const { toast } = useFx()
-  const { invalidate, openPostEdit } = usePost()
+  const { invalidate, openPostEdit, pendingLikes } = usePost()
+  const loadLikers = useCallback(async (afterId, limit) => {
+    await pendingLikes.get(post.id)
+    return fetchPostLikers(post.id, afterId, limit)
+  }, [pendingLikes, post.id])
   const userId = session?.user?.id
   const own = !!supabase && !!userId && userId === post.userId
+  const followTarget = showFollow && userId && !own ? post.userId : null
+  const { following, pending: followPending, setFollowing } = useFollowAction(followTarget, post.viewerFollows, post.followingReadAt)
+  const authorPath = post.userId ? '/u/' + post.userId : '/people'
   const canDeletePost = own || allowed
   const photo = removedPhotoPath && post.photoPath === removedPhotoPath ? null : post.photo
   const canDeletePhoto = allowed && !!photo && !!post.photoPath
@@ -149,10 +159,23 @@ export default function PostCard({ post, canteen, index = 0, onLike, onSeen, onD
   if (deleted) return null
   return <article ref={card} className="card post social-post rise" style={{'--i':Math.min(index,3)}}>
     <div className="pb ptop"><div className="ph">
-      <Link className="ph-who" to={post.userId ? '/u/'+post.userId : '/people'}>
-        <Avatar name={post.author.name} url={post.author.avatar}/>
-        <span className="who"><b>{post.author.name}{post.author.verified && <VerifiedBadge />}</b><small>{post.author.faculty ? post.author.faculty + ' · ' : ''}{timeAgo(post.createdAt)}</small></span>
-      </Link>
+      <div className="ph-who">
+        <Link className="post-author-avatar" to={authorPath} tabIndex={-1} aria-label="View author profile">
+          <Avatar name={post.author.name} url={post.author.avatar} />
+        </Link>
+        <div className="who">
+          <div className="post-author-line">
+            <Link className="post-author-link" to={authorPath}>
+              <b>{post.author.name}{post.author.verified && <VerifiedBadge />}</b>
+            </Link>
+            {followTarget && following === false && (
+              <button type="button" className="post-author-follow" disabled={followPending} aria-label={`Follow ${post.author.name}`}
+                onClick={async () => { if (await setFollowing(true)) toast(`Following ${post.author.name}`) }}>+ Follow</button>
+            )}
+          </div>
+          <small>{post.author.faculty ? post.author.faculty + ' · ' : ''}{timeAgo(post.createdAt)}</small>
+        </div>
+      </div>
       <span className={'rt '+cls}>{label}</span>
       {canDeletePost && <div className="post-manage-actions" role="group" aria-label={own ? 'Manage your post' : 'Manage post'}>
         {own && <button type="button" className="social-icon" disabled={busy} aria-label="Edit your post" title="Edit your post" onClick={() => openPostEdit(post)}>
@@ -169,7 +192,15 @@ export default function PostCard({ post, canteen, index = 0, onLike, onSeen, onD
     </div>
     <div className="pb">
       <div className="acts">
-        <button className={'like'+(post.liked?' on':'')+(post.liked&&pops?' pop':'')} aria-pressed={post.liked} aria-label={post.liked?'Unlike plate':'Like plate'} onClick={() => like()}><HeartIcon key={pops}/><span>{post.likes}</span></button>
+        <div className="post-likes">
+          <button className={'like post-like-toggle'+(post.liked?' on':'')+(post.liked&&pops?' pop':'')} type="button" aria-pressed={post.liked}
+            aria-label={post.liked?'Unlike plate':'Like plate'} onClick={() => like()}><HeartIcon key={pops}/></button>
+          {supabase && post.likes > 0 ? (
+            <button className="post-like-count" type="button" aria-label={`View ${plural(post.likes, 'like')}`} aria-haspopup="dialog"
+              title="See who liked this"
+              onClick={() => setLikesOpen(true)}>{post.likes.toLocaleString()}</button>
+          ) : <span className="post-like-count" aria-label={plural(post.likes, 'like')}>{post.likes.toLocaleString()}</span>}
+        </div>
         <button className="like" aria-haspopup="dialog" aria-label="Comments" onClick={() => setOpen(true)}><CommentIcon/><span>{commentCount}</span></button>
         <button className="like" aria-label="Share post" onClick={()=>share('/posts/'+post.id)}><Share2 size={21}/><span>Share</span></button>
         {canteen && <button className="social-icon location-share" aria-label="Share canteen location" onClick={()=>share(canteenMapLink(canteen))}><MapPin size={20}/></button>}
@@ -179,5 +210,7 @@ export default function PostCard({ post, canteen, index = 0, onLike, onSeen, onD
     </div>
     {open && <Comments key={post.id} postId={post.id} onClose={() => setOpen(false)}
       onCount={change => setCommentCount(count => Math.max(0, count + change))} />}
+    {likesOpen && <PeopleListDialog key={post.id} title="Likes" emptyMessage="No likes yet."
+      loadPage={loadLikers} onClose={() => setLikesOpen(false)} />}
   </article>
 }

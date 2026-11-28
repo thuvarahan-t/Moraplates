@@ -431,7 +431,6 @@ main{padding-bottom:clamp(24px,4vw,48px)}
 .av{overflow:hidden}.av img{display:block;width:100%;height:100%;object-fit:cover}
 .me{overflow:hidden}.me img{width:100%;height:100%;object-fit:cover}
 .ph-who{flex:1;display:flex;align-items:center;gap:10px;min-width:0;text-decoration:none;color:inherit}
-.ph-who:hover b{text-decoration:underline;text-underline-offset:3px}
 .avpick{position:relative;cursor:pointer;flex:none;border-radius:50%}
 .avpick .avcam{position:absolute;right:-2px;bottom:-2px;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--tom);color:#fff;box-shadow:0 0 0 3px var(--card);transition:transform .25s var(--spring)}
 .avpick:hover .avcam{transform:scale(1.1)}.avpick.busy{opacity:.6;pointer-events:none}

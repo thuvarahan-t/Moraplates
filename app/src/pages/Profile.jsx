@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import People from '../components/People'
+import PeopleListDialog from '../components/PeopleListDialog'
 import { exportPhoto } from '../lib/photoEdit'
 import { checkAdmin, moderateContent } from '../data/admin'
 import { samplePosts } from '../data/feed'
@@ -15,12 +16,13 @@ import { useAuth, useModeration } from '../lib/auth'
 import { badgesFor, isVerifiedProfile } from '../lib/badges'
 import { useFx } from '../lib/fx'
 import { RATING } from '../lib/format'
-import { usePost } from '../lib/post'
+import { useFollowAction, usePost } from '../lib/post'
 import { useSignInGate } from '../lib/useSignInGate'
 import { supabase } from '../lib/supabase'
 import { useQuery } from '../data/useQuery'
 import { queryKey } from '../data/queryCache'
-import { fetchFollowSummary, fetchPosts, fetchProfilePage, fetchPublicProfile, friendly, setProfileFollow, updateAvatar, updateProfile } from '../data/queries'
+import { fetchFollowSummary, fetchPosts, fetchProfilePage, fetchPublicProfile, friendly, updateAvatar, updateProfile } from '../data/queries'
+import { fetchProfileFollowList } from '../data/peopleLists'
 import { InstallButton } from '../components/InstallPrompt'
 
 const TONES = { leaf: ['var(--sb)', 'var(--st)'], mus: ['var(--ob)', 'var(--ot)'], tom: ['var(--ab)', 'var(--at)'] }
@@ -196,48 +198,37 @@ function RemoveProfilePhoto({ profile, disabled, onRemoved }) {
 }
 
 function ProfileFollows({ userId, viewerId }) {
-  const { cache } = usePost()
-  const { toast } = useFx()
   const gate = useSignInGate()
-  const key = queryKey('profile-follows', userId)
-  const load = () => fetchFollowSummary(userId)
-  const { data, error, reload } = useQuery(key, load, { enabled: !!supabase })
-  const [busy, setBusy] = useState(false)
-  const [saved, setSaved] = useState(null)
-  const summary = saved && saved.baseline === data ? saved.value : data
-
-  const toggle = async () => {
-    if (!summary || busy || !gate('to follow profiles')) return
-    const next = !summary.viewer_follows
-    setBusy(true)
-    try {
-      await setProfileFollow(userId, viewerId, next)
-      setSaved({
-        baseline: data,
-        value: {
-          ...summary,
-          followers: Math.max(0, Number(summary.followers) + (next ? 1 : -1)),
-          viewer_follows: next,
-        },
-      })
-      cache.invalidate('profile-follows')
-      await cache.load(key, load).catch(error => console.warn('Follow totals could not be refreshed', error.message))
-    } catch (error) {
-      toast(friendly(error))
-    } finally {
-      setBusy(false)
-    }
-  }
+  const { data: summary, error, reload } = useQuery(queryKey('profile-follows', userId),
+    () => fetchFollowSummary(userId), { enabled: !!supabase })
+  const { following, pending, setFollowing } = useFollowAction(userId, summary?.viewer_follows, summary?.followingReadAt)
+  const [list, setList] = useState(null)
+  const loadPage = useCallback((afterId, limit) => fetchProfileFollowList(userId, list, afterId, limit), [userId, list])
 
   if (error) return <button type="button" className="cm-action profile-follows-retry" onClick={reload}>Retry follows</button>
   if (!summary) return null
+  const followers = Math.max(0, Number(summary.followers) + Number(!!following) - Number(summary.viewer_follows))
+
   return (
     <div className="profile-follows">
-      <span>{summary.followers} {Number(summary.followers) === 1 ? 'follower' : 'followers'} · {summary.following} following</span>
-      {userId !== viewerId && (
-        <button type="button" className={`btn sm${summary.viewer_follows ? ' ghost' : ''}`} disabled={busy} onClick={toggle}>
-          {summary.viewer_follows ? 'Unfollow' : 'Follow'}
+      <div className="profile-follow-counts" aria-label="Follow counts" role="group">
+        <button type="button" aria-haspopup="dialog" onClick={() => setList('followers')}>
+          <strong>{followers}</strong> {followers === 1 ? 'follower' : 'followers'}
         </button>
+        <button type="button" aria-haspopup="dialog" onClick={() => setList('following')}>
+          <strong>{summary.following}</strong> following
+        </button>
+      </div>
+      {userId !== viewerId && (
+        <button type="button" className={`btn sm${following ? ' ghost' : ''}`} disabled={pending}
+          onClick={async () => { if (gate('to follow profiles') && await setFollowing(!following)) reload() }}>
+          {following ? 'Unfollow' : 'Follow'}
+        </button>
+      )}
+      {list && (
+        <PeopleListDialog title={list === 'followers' ? 'Followers' : 'Following'}
+          emptyMessage={list === 'followers' ? 'No followers yet.' : 'No one followed yet.'}
+          loadPage={loadPage} onClose={() => setList(null)} />
       )}
     </div>
   )

@@ -65,14 +65,14 @@ export default function FeedSection({ canteens }) {
       {loading && <Loader label="Loading plates" />}
       {error && <div className="card empty"><h3>Couldn't load plates</h3><button className="btn sm" onClick={refresh}>Retry</button></div>}
       <div className="posts">
-        {fresh.map((p, i) => <PostCard key={p.id} post={p} canteen={byId[p.canteenId]} index={i} onLike={toggleLike} onSeen={markSeen} />)}
+        {fresh.map((p, i) => <PostCard key={p.id} post={p} canteen={byId[p.canteenId]} index={i} showFollow onLike={toggleLike} onSeen={markSeen} />)}
         {caughtUp && posts.length > 0 && (
           <div className="feed-caught-up">
             <CircleCheck size={22} aria-hidden="true" />
             <div><h3>You're all caught up</h3>{past.length > 0 && <p>Enjoy some past plates.</p>}</div>
           </div>
         )}
-        {past.map((p, i) => <PostCard key={p.id} post={p} canteen={byId[p.canteenId]} index={freshCount + i} onLike={toggleLike} />)}
+        {past.map((p, i) => <PostCard key={p.id} post={p} canteen={byId[p.canteenId]} index={freshCount + i} showFollow onLike={toggleLike} />)}
         {!loading && !error && !posts.length && (
           <div className="card empty rise">
             <h3>No plates yet</h3>

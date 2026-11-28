@@ -1,0 +1,11 @@
+.people-list-dialog .people-list {
+  margin: 0;
+  padding: 8px 14px;
+  list-style: none;
+}
+
+.people-list-actions {
+  display: flex;
+  justify-content: center;
+  padding: 4px 14px 14px;
+}

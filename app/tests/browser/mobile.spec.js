@@ -26,7 +26,7 @@ test('feed likes, shares and seen history; a viewed plate remains on author prof
   await page.goto('/')
   const first=page.locator('.social-post').first()
   await expect(first).toBeVisible()
-  const author=await first.locator('.ph-who').getAttribute('href')
+  const author=await first.locator('.post-author-link').getAttribute('href')
   const like=first.getByRole('button',{name:'Like plate',exact:true})
   await like.click()
   await expect(first.getByRole('button',{name:'Unlike plate',exact:true})).toBeVisible()

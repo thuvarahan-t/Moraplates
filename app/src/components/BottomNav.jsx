@@ -24,7 +24,7 @@ function placeActivePill(nav) {
 }
 
 export default function BottomNav() {
-  const { openPost } = usePost()
+  const { openPost, refreshFeed } = usePost()
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const bar = useRef(null)
@@ -118,6 +118,15 @@ export default function BottomNav() {
     }
   }
 
+  function openFeed(event) {
+    if (event.defaultPrevented || event.button !== 0 || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+    if (pathname === '/') {
+      event.preventDefault()
+      window.scrollTo(0, 0)
+    }
+    refreshFeed()
+  }
+
   return (
     <nav ref={bar} className={preview ? 'bnav is-dragging' : 'bnav'} aria-label="Main"
       onPointerDown={start} onPointerMove={move} onPointerUp={event => finish(event, true)}
@@ -137,7 +146,8 @@ export default function BottomNav() {
           {path === '/top' && <button type="button" className="plus" onClick={openPost} aria-label="Post your plate">
             <PlusIcon size={24} style={{ strokeWidth: 2.6 }} />
           </button>}
-          <NavLink data-tab={path} data-preview={preview === path || undefined} draggable={false} to={path} end={path === '/'}>
+          <NavLink data-tab={path} data-preview={preview === path || undefined} draggable={false} to={path} end={path === '/'}
+            onClick={path === '/' ? openFeed : undefined}>
             <Icon size={24} />{label}
           </NavLink>
         </Fragment>
