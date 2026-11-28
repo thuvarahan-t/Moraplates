@@ -4,6 +4,7 @@ import { queryKey } from '../data/queryCache'
 import { useQuery } from '../data/useQuery'
 import { TrashIcon } from './icons'
 import Loader from './Loader'
+import ContentPhoto from './ContentPhoto'
 
 const PAGE_SIZE = 12
 
@@ -53,7 +54,7 @@ export default function CanteenPhotoManager({ canteen, removal, onClose }) {
 function ManagedPhoto({ url, caption, label, primary, disabled, onRemove }) {
   return (
     <li>
-      <img src={url} alt="" loading="lazy" />
+      <ContentPhoto src={url} alt="" loading="lazy" />
       <div className="canteen-managed-photo-actions">
         <span>{caption}{primary && <small>Primary photo</small>}</span>
         <button type="button" className="social-icon canteen-delete-action" title={label} aria-label={label}

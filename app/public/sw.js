@@ -3,7 +3,7 @@
    - Built assets (/assets/*, hashed by Vite) and icons: cache first, they never change under the same name.
    - Google Fonts: stale-while-revalidate.
    - Supabase (data, auth, photos) and every other request: untouched, always live. */
-const VERSION = 'v5'
+const VERSION = 'v6'
 const SHELL = `moraplates-shell-${VERSION}`
 const STATIC = `moraplates-static-${VERSION}`
 const FONTS = `moraplates-fonts-${VERSION}`

@@ -3,6 +3,7 @@ import { ImageOff, MapPin, Share2, Trash2 } from 'lucide-react'
 import { Link } from './NavLinks'
 import Dish from './Dish'
 import Comments from './Comments'
+import ContentPhoto from './ContentPhoto'
 import PeopleListDialog from './PeopleListDialog'
 import { CommentIcon, ForkKnifeIcon, HeartIcon, PencilIcon, SparkIcon } from './icons'
 import { plural, RATING, timeAgo } from '../lib/format'
@@ -57,8 +58,8 @@ function PostMedia({ photo, foodName, canteen, eager, reaction, onDoubleTap }) {
     onPointerDown={startTap} onPointerMove={moveTap} onPointerUp={endTap} onPointerCancel={cancelTap}
     onPointerLeave={e => { if (pointer.current?.id === e.pointerId) cancelTap() }}>
     {photo ? <>
-      {square && <img className="post-photo-blur" src={photo} alt="" aria-hidden="true" draggable={false} decoding="async" />}
-      <img className="photo" src={photo} alt={foodName} loading={loading} decoding="async" draggable={false}
+      {square && <ContentPhoto className="post-photo-blur" src={photo} alt="" aria-hidden="true" draggable={false} decoding="async" />}
+      <ContentPhoto className="photo" src={photo} alt={foodName} loading={loading} decoding="async" draggable={false}
         onLoad={({ currentTarget: image }) => setSquare(needsSquarePostFrame(image.naturalWidth, image.naturalHeight))}/>
     </> : <Dish name={foodName} colour={canteen?.colour}/>}
     {reaction > 0 && <span key={reaction} className="plate-reaction" aria-hidden="true">

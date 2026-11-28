@@ -401,6 +401,85 @@ try{
   assert.deepEqual(foundAccounts.map(row => [row.id, row.email, row.banned]), [[moderator.id, moderator.email, false]])
   assert.deepEqual(check(await account(b.client)), foundAccounts[0])
 
+  const visibilityCanteen = { ...moderationCanteen, name: `Visibility ${randomUUID().slice(0, 8)}` }
+  moderatedCanteen = check(await a.client.from('canteens').insert(visibilityCanteen).select('id').single()).id
+  adminCanteen = check(await moderator.client.from('canteens').insert({
+    ...visibilityCanteen, name: `Hidden ${randomUUID().slice(0, 8)}`,
+  }).select('id').single()).id
+  food = check(await a.client.from('foods').insert({ canteen_id: moderatedCanteen, name: 'Visible plate', price: 200 }).select('id').single()).id
+  const hiddenFood = check(await moderator.client.from('foods').insert({
+    canteen_id: moderatedCanteen, name: 'Hidden plate', price: 200,
+  }).select('id').single()).id
+  path = await uploadModerationPhoto()
+  const hiddenPhoto = moderator.id + '/' + randomUUID() + '.png'
+  moderationPaths.push(hiddenPhoto)
+  check(await moderator.client.storage.from('photos').upload(hiddenPhoto, png, { contentType: 'image/png' }))
+  check(await moderator.client.from('profiles').update({ avatar_path: hiddenPhoto }).eq('id', moderator.id))
+  const plate = { canteen_id: moderatedCanteen, food_id: food, rating: 'super', caption: 'Visibility test' }
+  post = check(await a.client.from('posts').insert({ ...plate, photo_path: path }).select('id').single()).id
+  const hiddenPost = check(await moderator.client.from('posts').insert({ ...plate, photo_path: hiddenPhoto }).select('id').single()).id
+  check(await a.client.from('comments').insert({ post_id: post, body: 'Visible comment' }))
+  const hiddenComment = check(await moderator.client.from('comments').insert({ post_id: post, body: 'Hidden comment' }).select('id').single()).id
+  const commentOnHiddenPost = check(await a.client.from('comments').insert({ post_id: hiddenPost, body: 'Hidden thread' }).select('id').single()).id
+  check(await moderator.client.from('likes').insert({ post_id: post }))
+  check(await b.client.from('likes').insert({ post_id: post }))
+  check(await a.client.from('likes').insert({ post_id: hiddenPost }))
+  check(await follow(moderator.client, a.id))
+  check(await follow(a.client, moderator.id))
+  const hiddenGallery = check(await moderator.client.from('canteen_photos').insert({
+    canteen_id: moderatedCanteen, photo_path: hiddenPhoto,
+  }).select('id').single()).id
+  check(await b.client.rpc('admin_save', {
+    kind: 'canteens', p: { ...visibilityCanteen, id: moderatedCanteen, primary_photo_id: hiddenGallery },
+  }))
+  check(await a.client.rpc('cast_vote', { canteen: moderatedCanteen }))
+  check(await moderator.client.rpc('cast_vote', { canteen: moderatedCanteen }))
+  check(await a.client.rpc('report_canteen_closed_today', { canteen: moderatedCanteen }))
+  check(await moderator.client.rpc('report_canteen_open', { canteen: moderatedCanteen }))
+
+  const row = (client, table, id, column = 'id', fields = column) => client.from(table).select(fields).eq(column, id).maybeSingle()
+  async function assertVisibility(viewer, show) {
+    for (const [table, id, column] of [
+      ['profiles', moderator.id, 'id'], ['profile_stats', moderator.id, 'user_id'], ['posts', hiddenPost, 'id'],
+      ['comments', hiddenComment, 'id'], ['comments', commentOnHiddenPost, 'id'],
+      ['canteen_photos', hiddenGallery, 'id'], ['canteen_standings', adminCanteen, 'id'], ['food_stats', hiddenFood, 'id'],
+    ]) {
+      assert.deepEqual(check(await row(viewer, table, id, column)), show ? { [column]: id } : null, `${table} visibility`)
+    }
+    const remaining = check(await row(viewer, 'posts', post, 'id', 'id,likes(count),comments(count)'))
+    assert.deepEqual(remaining, {
+      id: post, likes: [{ count: show ? 2 : 1 }], comments: [{ count: show ? 2 : 1 }],
+    })
+    assert.equal(check(await row(viewer, 'food_stats', food, 'id', 'super_count')).super_count, show ? 2 : 1)
+    const standings = check(await row(viewer, 'canteen_standings', moderatedCanteen, 'id', 'votes_this_week,primary_photo_id,last_reported_status'))
+    assert.deepEqual(standings, {
+      votes_this_week: show ? 2 : 1, primary_photo_id: show ? hiddenGallery : null, last_reported_status: show ? 'open' : 'closed',
+    })
+    const followList = (profileId, direction) => viewer.rpc('profile_follow_list', { target: profileId, direction })
+    assert.deepEqual(check(await followList(a.id, 'followers')).map(person => person.id), show ? [b.id, moderator.id].sort() : [b.id])
+    assert.deepEqual(check(await followList(moderator.id, 'followers')).map(person => person.id), show ? [a.id] : [])
+    const followsOfStudent = check(await viewer.rpc('profile_follow_summary', { target: a.id }).single())
+    assert.equal(Number(followsOfStudent.followers), show ? 2 : 1)
+    const likers = check(await viewer.rpc('post_liker_list', { target: post }))
+    assert.deepEqual(likers.map(person => person.id), show ? [b.id, moderator.id].sort() : [b.id])
+    const hiddenPostLikers = check(await viewer.rpc('post_liker_list', { target: hiddenPost }))
+    assert.deepEqual(hiddenPostLikers.map(person => person.id), show ? [a.id] : [])
+  }
+
+  const photoVisibility = async path => check(await guest.rpc('can_serve_photo', { photo_path: path }))
+  const oldPhotoUrl = guest.storage.from('photos').getPublicUrl(hiddenPhoto).data.publicUrl
+  const assertOldPhotoUrlDenied = async () => {
+    const result = await fetch(oldPhotoUrl)
+    await result.body?.cancel()
+    assert.ok(!result.ok, 'Legacy public Storage URLs cannot bypass visibility checks')
+  }
+  await assertVisibility(guest, true)
+  assert.equal(await photoVisibility(hiddenPhoto), true)
+  check(await guest.storage.from('photos').download(hiddenPhoto))
+  await assertOldPhotoUrlDenied()
+  const visibilityVersion = () => guest.rpc('content_visibility_version')
+  const versionBeforeBan = Number(check(await visibilityVersion()))
+
   const oldSession = check(await moderator.client.auth.getSession()).session
   const stale = createClient(url, anon, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -422,17 +501,29 @@ try{
   const credentials = { email: moderator.email, password: moderator.password }
   assert.equal((await client(anon).auth.signInWithPassword(credentials)).error?.code, 'user_banned')
   assert.ok((await client(anon).auth.refreshSession({ refresh_token: oldSession.refresh_token })).error)
-  assert.equal(check(await guest.from('profiles').select('id').eq('id', moderator.id).single()).id, moderator.id)
+  assert.equal(Number(check(await visibilityVersion())), versionBeforeBan + 1)
+  await Promise.all([assertVisibility(guest, false), assertVisibility(a.client, false), assertVisibility(b.client, true)])
+  assert.ok((await inbox(a.client)).every(row => row.actor_id !== moderator.id), 'Banned actors are hidden from a student notification inbox')
+  assert.equal(await photoVisibility(hiddenPhoto), false)
+  assert.equal(await photoVisibility(path), true)
+  assert.ok((await guest.storage.from('photos').download(hiddenPhoto)).error, 'A hidden user photo cannot be fetched anonymously')
+  check(await guest.storage.from('photos').download(path))
+  check(await b.client.storage.from('photos').download(hiddenPhoto))
+  await assertOldPhotoUrlDenied()
 
   check(await ban(b.client, false))
   assert.equal(check(await account(b.client)).banned, false)
   assert.equal(check(await accessStatus(stale)), 'signed_out', 'Unbanning never restores a revoked token')
   assert.equal((await stale.from('notifications').select('id')).error?.code, 'PT401')
+  assert.equal(Number(check(await visibilityVersion())), versionBeforeBan + 2)
+  await assertVisibility(guest, true)
+  assert.equal(await photoVisibility(hiddenPhoto), true)
+  check(await guest.storage.from('photos').download(hiddenPhoto))
   check(await moderator.client.auth.signInWithPassword(credentials))
   assert.equal(check(await accessStatus(moderator.client)), 'active')
   assert.equal(check(await moderator.client.rpc('is_content_moderator')), true)
 
-  console.log('PASS: media, social activity, live notifications, canteen status and votes, owner and moderator permissions, admin-only account details and bans, Auth/session revocation, and fresh login after unban')
+  console.log('PASS: media, social activity, live notifications, canteen status and votes, moderation, admin-only bans, session revocation, and content visibility for guest, student, admin and restored accounts')
 }finally{
   if(path)await service.storage.from('photos').remove([path])
   if(replacementPath)await service.storage.from('photos').remove([replacementPath])

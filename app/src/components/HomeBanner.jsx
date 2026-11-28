@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Link } from './NavLinks'
 import { Credit } from './Slideshow'
+import ContentPhoto from './ContentPhoto'
 import { TrashIcon } from './icons'
 import { useQuery } from '../data/useQuery'
 import { fetchHomeCanteenPhotos } from '../data/queries'
@@ -67,7 +68,7 @@ export default function HomeBanner({ canteens }) {
           <Link key={photo.id} className="bnr-slide" to={`/canteens/${canteen.id}`}
             aria-label={`${canteen.name}, see the canteen`} aria-hidden={index !== active}
             tabIndex={index === active ? undefined : -1}>
-            <img className="bnr-photo" src={photo.url} alt="" loading={index === 0 ? 'eager' : 'lazy'} />
+            <ContentPhoto className="bnr-photo" src={photo.url} alt="" loading={index === 0 ? 'eager' : 'lazy'} />
             {photo.by && <Credit name={photo.by} />}
             <div className="bnr-txt">
               <h2>{canteen.name}</h2>

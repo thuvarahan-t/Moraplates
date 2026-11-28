@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import People from '../components/People'
 import PeopleListDialog from '../components/PeopleListDialog'
+import ContentPhoto from '../components/ContentPhoto'
 import ProfileAdminAccount from '../components/ProfileAdminAccount'
 import { exportPhoto } from '../lib/photoEdit'
 import { checkAdmin, moderateContent } from '../data/admin'
@@ -285,7 +286,7 @@ function ProfileBody({ top, head, below, extra, stats: s, posts, authorId, viewe
           const [rl, rc] = RATING[p.rating]
           return (
             <Link key={p.id} className="card rise tilt" to={`/posts/${p.id}`} style={{ '--i': i, textDecoration: 'none', color: 'inherit' }}>
-              {p.photo ? <img className="sq" src={p.photo} alt={p.food.name} loading="lazy" /> : <Dish name={p.food.name} />}
+              {p.photo ? <ContentPhoto className="sq" src={p.photo} alt={p.food.name} loading="lazy" /> : <Dish name={p.food.name} />}
               <div className="mb"><span>{p.food.name}</span><span className={'rt ' + rc}>{rl}</span></div>
             </Link>
           )

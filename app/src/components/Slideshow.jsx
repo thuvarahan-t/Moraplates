@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import ContentPhoto from './ContentPhoto'
 import { REDUCED_MOTION } from '../lib/motion'
 
 /**
@@ -22,7 +23,7 @@ export default function Slideshow({ photos, interval = 4500, children }) {
   return (
     <>
       <div ref={slides} className="slides" aria-hidden="true">
-        {photos.map((p, k) => <img key={p.id} src={p.url} alt="" className={k === idx ? 'on' : undefined} loading={k < 2 ? 'eager' : 'lazy'} />)}
+        {photos.map((p, k) => <ContentPhoto key={p.id} src={p.url} alt="" className={k === idx ? 'on' : undefined} loading={k < 2 ? 'eager' : 'lazy'} />)}
       </div>
       {n > 0 && children?.(photos[idx], idx, setI)}
     </>

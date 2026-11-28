@@ -71,7 +71,8 @@ Enable the Maps JavaScript API with billing in Google Cloud. Set `VITE_GOOGLE_MA
 - Authors can edit their post's caption, rating, food, canteen and photo. Signed-in students can update any menu item's name and price, keeping existing posts and ratings linked.
 - Approved content moderators use their regular sign-in to remove posts, post photos, comments, profile photos, and canteen content from the pages where it appears. Deleting a menu item also removes its posts and ratings. Deleting a canteen removes its menu, posts, photos, votes, pins and status reports.
 - The admin console is protected by server-side RPC checks against `public.admin_users`. It manages canteens, foods, content moderation, profile display fields, likes, votes, gallery photos and closure reports. It deliberately does not provision login accounts or assign administrator roles from the browser.
-- Administrators can see the university email and ban or unban an account from its public profile or from **Admin console → Accounts**. Bans block login and revoke existing sessions while preserving the account and its posts. Unbanning requires a fresh login. Administrator accounts are protected.
+- Administrators can see the university email and ban or unban an account from its public profile or from **Admin console → Accounts**. Bans revoke existing sessions and hide the account and its content from non-admins. Unbanning restores visibility and requires a fresh login. Administrator accounts are protected.
+- Published photos use `/api/photo`, which checks current visibility on every request. For an existing live deployment, deploy that route and its client URLs before applying `20261128170000_private_visible_photos.sql` so the bucket can become private without breaking visible photos.
 
 ### Deployment order
 

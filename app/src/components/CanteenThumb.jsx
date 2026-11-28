@@ -1,4 +1,5 @@
 import Dish from './Dish'
+import ContentPhoto from './ContentPhoto'
 
 /** Small square canteen picture, with the selected cover taking priority over the newest photo. */
 export default function CanteenThumb({ canteen, photo, size = 76 }) {
@@ -6,7 +7,7 @@ export default function CanteenThumb({ canteen, photo, size = 76 }) {
   return (
     <span className="cthumb" style={{ width: size, height: size }}>
       {cover
-        ? <img src={cover.url} alt="" loading="lazy" />
+        ? <ContentPhoto src={cover.url} alt="" loading="lazy" />
         : <Dish name={canteen.knownFor || canteen.name} colour={canteen.colour} />}
     </span>
   )
