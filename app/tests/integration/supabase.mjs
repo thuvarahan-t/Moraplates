@@ -41,6 +41,32 @@ try{
   })
 
   check(await b.client.from('likes').insert({ post_id: post }))
+  check(await moderator.client.from('likes').insert({ post_id: post }))
+  const likerPage = afterId => guest.rpc('post_liker_list', { target: post, after_id: afterId, page_size: 1 })
+  const firstLiker = check(await likerPage(null))[0]
+  const secondLiker = check(await likerPage(firstLiker.id))[0]
+  assert.deepEqual([firstLiker.id, secondLiker.id], [b.id, moderator.id].sort())
+  assert.deepEqual(Object.keys(firstLiker).sort(), ['avatar_path', 'batch', 'faculty', 'full_name', 'id'])
+  assert.deepEqual(check(await likerPage(secondLiker.id)), [])
+  check(await moderator.client.from('likes').delete().eq('post_id', post).eq('user_id', moderator.id))
+  assert.deepEqual(check(await likerPage(null)).map(person => person.id), [b.id])
+
+  const follow = (client, id) => client.from('profile_follows').upsert({ followed_id: id }, {
+    onConflict: 'follower_id,followed_id', ignoreDuplicates: true,
+  })
+  check(await follow(a.client, b.id))
+  check(await follow(moderator.client, b.id))
+  check(await follow(b.client, a.id))
+  const followers = afterId => guest.rpc('profile_follow_list', { target: b.id, direction: 'followers', after_id: afterId, page_size: 1 })
+  const firstFollower = check(await followers(null))[0]
+  const secondFollower = check(await followers(firstFollower.id))[0]
+  assert.deepEqual([firstFollower.id, secondFollower.id], [a.id, moderator.id].sort())
+  assert.deepEqual(check(await guest.rpc('profile_follow_list', { target: b.id, direction: 'following' })).map(person => person.id), [a.id])
+  assert.ok((await guest.from('profile_follows').select('follower_id')).error, 'Guest follow reads use the public list RPC')
+  assert.deepEqual(check(await a.client.from('profile_follows').select('followed_id')), [{ followed_id: b.id }])
+  check(await a.client.from('profile_follows').delete().eq('follower_id', a.id).eq('followed_id', b.id))
+  assert.deepEqual(check(await followers(null)).map(person => person.id), [moderator.id])
+
   const postDetails = async () => check(await guest.from('posts')
     .select('created_at, user_id, caption, rating, photo_path, food_id, likes(count)').eq('id', post).single())
   const original = await postDetails()
@@ -301,7 +327,7 @@ try{
   assert.equal(check(await guest.from('canteens').select('id').eq('id', moderatedCanteen).maybeSingle()), null)
   moderatedCanteen = null
 
-  console.log('PASS: photo upload and replacement, owner post edits, shared food edits, seen privacy, closure and reopening, personal pins, admin CRUD, weekly vote totals and switching, owner deletion, scoped moderation and cross-owner storage cleanup')
+  console.log('PASS: photo upload and replacement, owner post edits, shared food edits, public follow and like lists, seen privacy, closure and reopening, personal pins, admin CRUD, weekly vote totals and switching, owner deletion, scoped moderation and cross-owner storage cleanup')
 }finally{
   if(path)await service.storage.from('photos').remove([path])
   if(replacementPath)await service.storage.from('photos').remove([replacementPath])

@@ -71,3 +71,20 @@ test('mobile tab highlight jumps to the selected tab with reduced motion', async
   await expect(pill).toHaveCSS('transition-property', 'none')
   expect(Math.abs((await pill.boundingBox()).x - (await profile.boundingBox()).x)).toBeLessThan(1)
 })
+
+test('tapping the active Feed tab returns to the top and refreshes plates', async ({ page }) => {
+  await page.goto('/')
+  const cards = page.locator('.social-post')
+  const first = cards.first()
+  await expect(first).toBeVisible()
+  const food = await first.locator('.post-food b').innerText()
+  await first.evaluate(card => card.scrollIntoView({ block: 'center' }))
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('moraplates:seen:v1:guest'))).not.toBeNull()
+
+  const feed = page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Feed' })
+  await feed.tap()
+  await expect(page).toHaveURL(/\/$/)
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0)
+  await expect(cards.first().locator('.post-food b')).not.toHaveText(food)
+})

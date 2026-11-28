@@ -22,12 +22,11 @@ export function samplePosts() {
 export function useLikeToggle(postsRef, setPosts) {
   const { toast } = useFx()
   const { session } = useAuth()
-  const { cache } = usePost()
+  const { cache, pendingLikes } = usePost()
   const userId = session?.user?.id
 
-  const pending = useRef(new Set())
   return useCallback((id, targetLiked) => {
-    if (pending.current.has(id)) return false
+    if (pendingLikes.has(id)) return false
     const p = postsRef.current?.find(x => x.id === id)
     if (!p) return false
     const liked = targetLiked ?? !p.liked
@@ -37,15 +36,15 @@ export function useLikeToggle(postsRef, setPosts) {
     const apply = l => setPosts(ps => ps?.map(x => (x.id === id ? { ...x, liked: l, likes: Math.max(0, x.likes + (x.liked === l ? 0 : l ? 1 : -1)) } : x)) ?? ps)
     apply(liked)
     if (supabase) {
-      pending.current.add(id)
-      setLike(id, userId, liked).then(() => cache.invalidate(...POST_READS)).catch(err => {
+      const write = setLike(id, userId, liked).then(() => cache.invalidate(...POST_READS)).catch(err => {
         console.error(err)
         apply(!liked)
         toast("Couldn't save your like. Try again.")
-      }).finally(() => pending.current.delete(id))
+      }).finally(() => pendingLikes.delete(id))
+      pendingLikes.set(id, write)
     }
     return liked
-  }, [cache, postsRef, setPosts, userId, toast])
+  }, [cache, pendingLikes, postsRef, setPosts, userId, toast])
 }
 
 const PAGE_SIZE = 20
@@ -80,7 +79,7 @@ async function fetchFeedPage(cache, userId, canteenId, { past, before, seen, dis
   let cursor = before
   do {
     const pageStart = cursor
-    const rows = await cache.load(feedKey(canteenId, past, pageStart), () => fetchPosts(userId, { canteenId, unseen: !past, before: pageStart, limit: PAGE_SIZE }))
+    const rows = await cache.load(feedKey(canteenId, past, pageStart), () => fetchPosts(userId, { canteenId, unseen: !past, withFollowing: true, before: pageStart, limit: PAGE_SIZE }))
     const page = feedPage(rows, past, seen, displayed)
     if (page.posts.length || !page.cursor) return page
     cursor = page.cursor
@@ -98,13 +97,12 @@ async function fetchFollowingPage(cache, userId, canteenId, page, options) {
 /** Keep current cards in place while reading, and bring back history once the fresh queue is exhausted. */
 export function useFeed(canteenId) {
   const { session, ready } = useAuth()
-  const { cache, version } = usePost()
+  const { cache, version, feedVersion, refreshFeed } = usePost()
   const userId = session?.user?.id
-  const [refreshKey, refresh] = useState(0)
   const start = useMemo(() => {
     const seen = readSeen(userId)
     return { seen, page: ready ? readCachedFeed(cache, canteenId, seen) : null }
-  }, [cache, canteenId, userId, ready, version, refreshKey])
+  }, [cache, canteenId, userId, ready, version, feedVersion])
   const [displayScope, setDisplayScope] = useState(start)
   const [posts, setPosts] = useState(start.page?.posts ?? null)
   const [error, setError] = useState(null)
@@ -207,6 +205,6 @@ export function useFeed(canteenId) {
     more: hasNextPage(visiblePage), loadingMore: inScope && loadingMore, pageError: inScope && pageError,
     caughtUp: !!visiblePage?.past, freshCount: visiblePage?.past ? visiblePage.freshCount ?? 0 : visiblePosts?.length ?? 0,
     awaitingHistory: !!visiblePage && !visiblePage.past && !visiblePage.cursor, loadMore, markSeen, toggleLike,
-    refresh: () => { cache.invalidate('feed'); refresh(n => n + 1) },
+    refresh: refreshFeed,
   }
 }

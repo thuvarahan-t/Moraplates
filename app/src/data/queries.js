@@ -48,7 +48,7 @@ const POST_FIELDS = 'id, user_id, canteen_id, food_id, rating, caption, photo_pa
 export const POST_READS = ['feed', 'own-profile', 'public-profile', 'post', 'canteen', 'food-posts']
 
 /** Latest posts, optionally for one canteen, food or author, with the viewer's likes. */
-export async function fetchPosts(viewerId, { canteenId, foodId, authorId, postId, before, unseen = false, limit = 60 } = {}) {
+export async function fetchPosts(viewerId, { canteenId, foodId, authorId, postId, before, unseen = false, withFollowing = false, limit = 60 } = {}) {
   need()
   const query = includeSeen => {
     let q = supabase.from('posts').select(POST_FIELDS + (includeSeen ? ', seen:post_views()' : '')).order('created_at', { ascending: false }).order('id', { ascending: false }).limit(limit)
@@ -63,13 +63,17 @@ export async function fetchPosts(viewerId, { canteenId, foodId, authorId, postId
   // Keep the actual live posts readable if the seen-history migration is pending.
   // The feed already filters locally remembered post IDs in that case.
   const rows = check(await queryWithSeenFallback(query, !!viewerId && unseen))
-  const [likes, badgeStats] = rows.length ? await Promise.all([
+  const authorIds = [...new Set(rows.map(r => r.user_id))]
+  const followingReadAt = withFollowing && viewerId ? Date.now() : undefined
+  const [likes, badgeStats, follows] = rows.length ? await Promise.all([
     viewerId ? supabase.from('likes').select('post_id').eq('user_id', viewerId).in('post_id', rows.map(r => r.id)) : { data: [] },
-    supabase.from('profile_stats').select(VERIFIED_STATS_FIELDS).in('user_id', [...new Set(rows.map(r => r.user_id))]),
-  ]) : [{ data: [] }, { data: [] }]
+    supabase.from('profile_stats').select(VERIFIED_STATS_FIELDS).in('user_id', authorIds),
+    withFollowing && viewerId ? supabase.from('profile_follows').select('followed_id').eq('follower_id', viewerId).in('followed_id', authorIds) : null,
+  ]) : [{ data: [] }, { data: [] }, null]
   const mine = new Set(check(likes).map(l => l.post_id))
   if (badgeStats.error) console.warn('Post author badges unavailable', badgeStats.error.message)
   const verified = new Set((badgeStats.data ?? []).filter(isVerifiedProfile).map(r => r.user_id))
+  const followed = follows?.data && new Set(follows.data.map(row => row.followed_id))
   return rows.map(r => ({
     id: r.id,
     userId: r.user_id,
@@ -86,6 +90,7 @@ export async function fetchPosts(viewerId, { canteenId, foodId, authorId, postId
     likes: r.likes[0]?.count ?? 0,
     comments: r.comments[0]?.count ?? 0,
     liked: mine.has(r.id),
+    ...(followed && { viewerFollows: followed.has(r.user_id), followingReadAt }),
   }))
 }
 
@@ -320,9 +325,11 @@ export async function fetchPublicProfile(userId, viewerId) {
 
 export async function fetchFollowSummary(userId) {
   need()
+  const followingReadAt = Date.now()
   const result = await supabase.rpc('profile_follow_summary', { target: userId }).single()
   if (result.error?.code === 'PGRST202') return null
-  return check(result)
+  const summary = check(result)
+  return summary && { ...summary, followingReadAt }
 }
 
 export async function setProfileFollow(userId, viewerId, following) {
