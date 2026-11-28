@@ -3,6 +3,7 @@ import PostDialog from '../components/PostDialog'
 import { createQueryCache } from '../data/queryCache'
 import { friendly, setProfileFollow } from '../data/queries'
 import { useAuth } from './auth'
+import { useContentVisibility } from './useContentVisibility'
 import { useFx } from './fx'
 
 const PostContext = createContext(null)
@@ -54,7 +55,9 @@ function useFollowChanges(cache, userId) {
 export function PostProvider({ children }) {
   const { session } = useAuth()
   const userId = session?.user?.id
-  const { cache, pendingLikes } = useMemo(() => ({ cache: createQueryCache(), pendingLikes: new Map() }), [userId])
+  const visibilityRevision = useContentVisibility()
+  const cache = useMemo(() => createQueryCache(), [userId, visibilityRevision])
+  const pendingLikes = useMemo(() => new Map(), [userId])
   const { followChanges, changeFollow } = useFollowChanges(cache, userId)
   const [request, setRequest] = useState(null)
   const [version, setVersion] = useState(0)

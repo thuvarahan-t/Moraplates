@@ -16,7 +16,7 @@ export function useAccountBan(onChanged) {
     const banned = !account.banned
     const label = accountLabel(account)
     const description = banned
-      ? `Ban ${label}? This ends their signed-in access and blocks sign-in until an administrator unbans the account.`
+      ? `Ban ${label}? This ends their signed-in access and hides their profile and content until an administrator unbans the account.`
       : `Unban ${label}? They can sign in and use the app again.`
     if (!window.confirm(description)) return
 

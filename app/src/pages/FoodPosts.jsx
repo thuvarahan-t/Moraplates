@@ -5,6 +5,7 @@ import { BackIcon, TrashIcon } from '../components/icons'
 import Loader from '../components/Loader'
 import { Link } from '../components/NavLinks'
 import PostCard from '../components/PostCard'
+import ContentPhoto from '../components/ContentPhoto'
 import { samplePosts, useLikeToggle } from '../data/feed'
 import { queryKey } from '../data/queryCache'
 import { fetchFoodPageDetails, fetchPosts } from '../data/queries'
@@ -98,7 +99,7 @@ function FoodPlateList({ canteen, food }) {
       </div>
       {removal.allowed && food.photoPath && food.photo && (
         <div className="card food-moderation-photo">
-          <img src={food.photo} alt={`Menu photo for ${food.name}`} />
+          <ContentPhoto src={food.photo} alt={`Menu photo for ${food.name}`} />
           <button type="button" className="mini canteen-delete-action" disabled={removal.busy}
             onClick={() => removal.remove('food_photos', food.id, {
               confirmation: `Delete the menu photo for ${food.name}?`,

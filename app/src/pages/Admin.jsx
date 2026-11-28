@@ -1,6 +1,7 @@
 import {useEffect,useState} from 'react'
 import {ShieldCheck,Plus,Pencil,Trash2} from 'lucide-react'
 import AdminAccounts from '../components/AdminAccounts'
+import ContentPhoto from '../components/ContentPhoto'
 import {Link} from '../components/NavLinks'
 import {useAdmin} from '../lib/useAdmin'
 import {useFx} from '../lib/fx'
@@ -66,7 +67,7 @@ function PrimaryPhotoPicker({ canteenId, selected, onSelect, disabled }) {
           {data.slice(0, PHOTOS_PER_PAGE).map((photo, index) => (
             <button key={photo.id} type="button" aria-pressed={selected === photo.id}
               aria-label={`Select gallery photo ${page * PHOTOS_PER_PAGE + index + 1} by ${photo.by}`} onClick={() => onSelect(photo.id)}>
-              <img src={photo.url} alt="" loading="lazy" />
+              <ContentPhoto src={photo.url} alt="" loading="lazy" />
               <span>{selected === photo.id ? 'Primary photo' : photo.by}</span>
             </button>
           ))}
@@ -152,7 +153,7 @@ export default function Admin(){
     {!rows&&!error&&<Loader label="Loading records"/>}
     {rows?.length===0&&<p>No records on this page.</p>}
     <div className="admin-records">{rows?.map(r=><article className="card admin-record" key={recordKey(r)}>
-      {r.photo_path&&<img src={photoUrl(r.photo_path)} alt="" loading="lazy"/>}
+      {r.photo_path&&<ContentPhoto src={photoUrl(r.photo_path)} alt="" loading="lazy"/>}
       <div><b>{title(r)||'Record'}</b><small>{summary(r)}</small><small className="admin-id">{recordKey(r)}</small></div>
       <div className="admin-actions">{config.fields&&<button className="social-icon" disabled={busy} aria-label="Edit record" onClick={()=>setDraft(editRecord(kind, r))}><Pencil size={18}/></button>}{!config.keep&&<button className="social-icon danger" disabled={busy} aria-label="Delete record" onClick={()=>remove(r)}><Trash2 size={18}/></button>}</div>
     </article>)}</div>
