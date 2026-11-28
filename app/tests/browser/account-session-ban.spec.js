@@ -23,12 +23,12 @@ test('an open session signs out on detection of an account ban', async ({ page }
     return route.fulfill({ json: [] })
   })
   await page.goto(server.resolvedUrls.local[0], { waitUntil: 'domcontentloaded' })
-  await expect(page.getByRole('link', { name: 'Your profile' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Notifications', exact: true })).toBeVisible()
 
   status = 'banned'
   await page.evaluate(() => window.dispatchEvent(new Event('focus')))
   await expect(page.getByText('This account has been banned from MoraPlates.')).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Your profile' })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'Sign in', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: /^Notifications/ })).toHaveCount(0)
   await expect.poll(() => logouts).toBe(1)
 })
